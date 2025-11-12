@@ -1,4 +1,4 @@
-// CharacterDataStructs.h
+
 #pragma once
 #include "CoreMinimal.h"
 #include "CharacterDataStructs.generated.h"
@@ -18,16 +18,16 @@ struct FCharacterData
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Hp;
+	int32 Hp = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Stamina;
+	int32 Stamina = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 hungry;
+	int32 hungry = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 weight;
+	int32 weight = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FString> Abilities;
