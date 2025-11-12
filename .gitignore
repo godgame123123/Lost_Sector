@@ -74,8 +74,10 @@ Plugins/**/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
+.idea/*
 
 Content/**
+!Content/Team_Folder/
 !Content/Team_Folder/**
-!Content/ThirdPerson/**
+
 
