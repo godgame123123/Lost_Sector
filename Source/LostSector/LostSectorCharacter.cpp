@@ -52,10 +52,10 @@ ALostSectorCharacter::ALostSectorCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	
 	// 캐릭터 생성 시 기본 Stats 값
-	CharacterStats.Hp = 100;
-	CharacterStats.Stamina = 100;
-	CharacterStats.hungry = 100;
-	CharacterStats.weight = 0;
+	CharacterStats.Hp = 100.0f;
+	CharacterStats.Stamina = 100.0f;
+	CharacterStats.hungry = 100.0f;
+	CharacterStats.weight = 0.0f;
 
 	
 }
@@ -111,7 +111,7 @@ void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 	}
 
 }
-bool ALostSectorCharacter::ConsumeStamina(int32 StaminaCost)
+bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
 	// 1. Stamina가 비용보다 크거나 같은지 확인
 	if (CharacterStats.Stamina >= StaminaCost)
@@ -119,7 +119,7 @@ bool ALostSectorCharacter::ConsumeStamina(int32 StaminaCost)
 		// 2. Stamina 감소
 		CharacterStats.Stamina -= StaminaCost;
 		// (선택) 디버깅 로그 출력
-		UE_LOG(LogTemp, Warning, TEXT("Stamina Consumed: %d. Current Stamina: %d"), StaminaCost, CharacterStats.Stamina);
+		UE_LOG(LogTemp, Warning, TEXT("Stamina Consumed: %f	. Current Stamina: %f"), StaminaCost, CharacterStats.Stamina);
 		// 3. Stamina 소모 성공
 		return true;
 	}
@@ -140,8 +140,8 @@ void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
 	// MaxStamina 값을 FCharacterData에 추가하지 않았다면, 임시 Max 값 사용 (예시)
-	const int32 MaxStamina = 100;
-	int32 StaminaChange = 0;
+	const float MaxStamina = 100.0f;
+	float StaminaChange = 0.0f;
 	// 현재 월드 시간 가져오기
 	const float CurrentTime = GetWorld()->GetTimeSeconds();
 	// Stamina 재생 지연 시간 (초)
@@ -152,7 +152,7 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 	if (bIsSprinting)
 	{
 		// 달릴 때: Stamina 소모 (예: 틱당 -1)
-		StaminaChange = -1;
+		StaminaChange = -1.0f;
 	}
 	else // 평소 상태 (재생 시도)
 	{
@@ -162,11 +162,11 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 			// 지연 시간이 지났는지 확인
 			if (CurrentTime < RegenAllowedTime)
 			{
-				StaminaChange = 0; // 지연 시간 이내: 재생 막음
+				StaminaChange = 0.0f; // 지연 시간 이내: 재생 막음
 			}
 			else
 			{
-				StaminaChange = 1; // 지연 시간 경과: Stamina 재생
+				StaminaChange = 1.0f; // 지연 시간 경과: Stamina 재생
 			}
 		}
 	}
@@ -174,10 +174,10 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 	CharacterStats.Stamina += StaminaChange;
 
 	// 최소/최대 값으로 Clamp (0 이하, Max 이상으로 넘어가지 않게 방지)
-	CharacterStats.Stamina = FMath::Clamp(CharacterStats.Stamina, 0, MaxStamina);
+	CharacterStats.Stamina = FMath::Clamp(CharacterStats.Stamina, 0.0f, MaxStamina);
 
 	// Stamina가 0에 도달했을 때의 로직
-	if (CharacterStats.Stamina <= 0)
+	if (CharacterStats.Stamina <= 0.0f)
 	{
 		// 강제 워킹 로직 (Stamina가 0이 되면 달리기 상태 해제)
 		if (bIsSprinting)
@@ -206,34 +206,31 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 void ALostSectorCharacter::HungerDrainTick()
 {
 	// 1. Hunger 소모 로직
-	// 'hungry'는 int32 타입이므로 소수점 계산을 위해 float으로 변환
-	if (CharacterStats.hungry > 0)
+	if (CharacterStats.hungry > 0.0f) // 0.0f와 비교
 	{
-		float CurrentHungryFloat = (float)CharacterStats.hungry;
+		// 틱당 소모량 (0.05f)만큼 직접 감소
+		CharacterStats.hungry -= HungerDrainPerTick;
 
-		// 틱당 소모량 적용 (예: 0.05씩 감소)
-		CurrentHungryFloat -= HungerDrainPerTick;
-
-		// 다시 int32로 변환하여 저장 (0 미만 방지 및 반올림하여 정수화)
-		CharacterStats.hungry = FMath::Max(0, FMath::RoundToInt(CurrentHungryFloat));
+		// 0.0f 미만으로 내려가지 않도록 Clamp
+		CharacterStats.hungry = FMath::Max(0.0f, CharacterStats.hungry);
 	}
 
 	// 2. Hunger가 0일 때 HP 감소 로직
-	if (CharacterStats.hungry <= 0)
+	if (CharacterStats.hungry <= 0.0f) // 0.0f와 비교
 	{
-		// HP가 0보다 클 때만 HP 감소
-		if (CharacterStats.Hp > 0)
+		// HP가 0.0f보다 클 때만 HP 감소
+		if (CharacterStats.Hp > 0.0f) // 0.0f와 비교
 		{
+			// HealthDrainPerTick은 int32이지만 float 연산에 문제 없음
 			CharacterStats.Hp -= HealthDrainPerTick;
 
-			// HP가 0 미만으로 내려가지 않도록 Clamp
-			CharacterStats.Hp = FMath::Max(CharacterStats.Hp, 0);
+			// HP가 0.0f 미만으로 내려가지 않도록 Clamp
+			CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
 
-			// (선택) 로그를 출력하여 HP 감소 확인
-			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %d"), CharacterStats.Hp);
+			// (선택) 로그 출력 시 포맷 지정자 %f로 변경
+			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
 		}
 	}
-
 }
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)

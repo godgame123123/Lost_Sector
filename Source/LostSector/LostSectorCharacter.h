@@ -52,7 +52,7 @@ public:
 
 	// 2. Stamina를 감소시키는 함수를 선언하고 BlueprintCallable로 노출
 	UFUNCTION(BlueprintCallable, Category = "Stats|Movement")
-	bool ConsumeStamina(int32 StaminaCost);
+	bool ConsumeStamina(float StaminaCost);
 public:
 	// Blueprint에서 달리기 상태를 설정할 수 있도록 노출
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stamina")
