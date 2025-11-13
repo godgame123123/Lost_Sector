@@ -18,16 +18,16 @@ struct FCharacterData
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Hp = 0;
+	float Hp = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Stamina = 0;
+	float Stamina = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 hungry = 0;
+	float hungry = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 weight = 0;
+	float weight = 0;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TArray<FString> Abilities;
