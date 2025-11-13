@@ -74,6 +74,19 @@ private:
 
 	// 재생 지연 시간 (상수)
 	const float StaminaRegenDelayDuration = 2.0f; // 1.0초 지연 (원하는 값으로 설정)
+
+	// 배고픔/체력 로직 추가 시작
+	FTimerHandle HungerTimerHandle; // 배고픔 틱을 위한 타이머 핸들
+	UFUNCTION()
+	void HungerDrainTick(); // 주기적으로 배고픔와 체력를 체크하고 소모할 함수
+
+
+	// 배고픔 상수 정의
+	// 배고픔 소모 속도: 10초에 5씩 감소 (0.1틱당 0.05)
+	const float HungerDrainPerTick = 0.05f;
+	// 배고픔 0일 때 체력 감소 속도: 1초당 10씩 감소 (0.1틱당 1)
+	const int32 HealthDrainPerTick = 1;
+	// 배고픔/체력 로직 추가 끝 
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);

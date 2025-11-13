@@ -51,9 +51,13 @@ ALostSectorCharacter::ALostSectorCharacter()
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	
-	// 캐릭터 생성 시 기본 Stamina 값 설정
+	// 캐릭터 생성 시 기본 Stats 값
+	CharacterStats.Hp = 100;
 	CharacterStats.Stamina = 100;
+	CharacterStats.hungry = 100;
+	CharacterStats.weight = 0;
 
+	
 }
 
 void ALostSectorCharacter::BeginPlay()
@@ -70,7 +74,6 @@ void ALostSectorCharacter::BeginPlay()
 		}
 	}
 
-	// BeginPlay에서 StaminaRegenDrainTick 함수를 0.1초마다 반복 호출하도록 타이머 설정
 	GetWorldTimerManager().SetTimer(
 		StaminaTimerHandle,
 		this,
@@ -78,6 +81,15 @@ void ALostSectorCharacter::BeginPlay()
 		0.1f, // 틱 간격
 		true  // 반복
 	);
+
+	GetWorldTimerManager().SetTimer(
+		HungerTimerHandle,
+		this,
+		&ALostSectorCharacter::HungerDrainTick,
+		0.1f, // 틱 간격
+		true
+	);
+
 }
 // Input
 
@@ -135,7 +147,7 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 	// Stamina 재생 지연 시간 (초)
 	const float LastDrainTime = FMath::Max(LastSprintEndTime, LastStaminaZeroTime);
 	// 재생 지연 시간 계산
-	const float RegenAllowedTime = LastSprintEndTime + StaminaRegenDelayDuration;
+	const float RegenAllowedTime = LastDrainTime + StaminaRegenDelayDuration;
 	// 달리기 상태 체크 및 Stamina 변경량 결정
 	if (bIsSprinting)
 	{
@@ -178,7 +190,10 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 		}
 		// Stamina가 0인 상태를 유지할 때 LastStaminaZeroTime을 현재 시간으로 갱신
 		// (LastStaminaZeroTime을 계속 갱신하여 0인 상태에서는 재생이 영원히 차단되게 합니다.)
-		LastStaminaZeroTime = CurrentTime;
+		if (LastStaminaZeroTime == 0.0f)
+		{
+			LastStaminaZeroTime = CurrentTime;
+		}
 	}
 	// Stamina가 1 이상으로 올라오면 (재생 가능 상태가 되면) LastStaminaZeroTime 초기화
 	// (이렇게 해야 지연 시간이 끝난 후 재생이 시작됨과 동시에 LastStaminaZeroTime이 갱신되지 않습니다.)
@@ -186,6 +201,39 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 	{
 		LastStaminaZeroTime = 0.0f; // Stamina가 0이 아닐 때는 초기화
 	}
+}
+
+void ALostSectorCharacter::HungerDrainTick()
+{
+	// 1. Hunger 소모 로직
+	// 'hungry'는 int32 타입이므로 소수점 계산을 위해 float으로 변환
+	if (CharacterStats.hungry > 0)
+	{
+		float CurrentHungryFloat = (float)CharacterStats.hungry;
+
+		// 틱당 소모량 적용 (예: 0.05씩 감소)
+		CurrentHungryFloat -= HungerDrainPerTick;
+
+		// 다시 int32로 변환하여 저장 (0 미만 방지 및 반올림하여 정수화)
+		CharacterStats.hungry = FMath::Max(0, FMath::RoundToInt(CurrentHungryFloat));
+	}
+
+	// 2. Hunger가 0일 때 HP 감소 로직
+	if (CharacterStats.hungry <= 0)
+	{
+		// HP가 0보다 클 때만 HP 감소
+		if (CharacterStats.Hp > 0)
+		{
+			CharacterStats.Hp -= HealthDrainPerTick;
+
+			// HP가 0 미만으로 내려가지 않도록 Clamp
+			CharacterStats.Hp = FMath::Max(CharacterStats.Hp, 0);
+
+			// (선택) 로그를 출력하여 HP 감소 확인
+			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %d"), CharacterStats.Hp);
+		}
+	}
+
 }
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)
