@@ -4,6 +4,37 @@
 #include "Engine/Engine.h"
 #include "HAL/IConsoleManager.h"
 
+namespace
+{
+	const TCHAR* LobbyMapPath = TEXT("/Game/BattleRoyaleStarterKit/Maps/BattleRoyale_Map_a/RobbyMap");
+	const TCHAR* LobbyTravelOptions = TEXT("?listen");
+
+	const TCHAR* GameMapPath = TEXT("/Game/BattleRoyaleStarterKit/Maps/BattleRoyale_Map_a/GameMap");
+	const TCHAR* GameTravelOptions = TEXT("?game=/Script/LostSector.RaidGameMode");
+
+	FString BuildServerTravelURL(const TCHAR* MapPath, const TCHAR* Options)
+	{
+		FString URL(MapPath);
+		if (Options && *Options)
+		{
+			URL += Options;
+		}
+		return URL;
+	}
+
+	bool TravelOnServer(UWorld* World, const FString& URL)
+	{
+		const ENetMode NetMode = World->GetNetMode();
+		if (NetMode == NM_DedicatedServer || NetMode == NM_ListenServer)
+		{
+			World->ServerTravel(URL);
+			return true;
+		}
+
+		return false;
+	}
+}
+
 void UMapTravelManager::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -40,10 +71,23 @@ void UMapTravelManager::TravelToLobby()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	UE_LOG(LogTemp, Log, TEXT("Traveling to Lobby"));
-    
-	// 로비맵으로 이동 (Listen Server로 열기)
-	UGameplayStatics::OpenLevel(World, FName(TEXT("LobbyMap")), true, TEXT("listen"));
+	const ENetMode NetMode = World->GetNetMode();
+
+	if (NetMode == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TravelToLobby는 서버 또는 스탠드얼론 환경에서만 호출해야 합니다."));
+		return;
+	}
+
+	if (NetMode == NM_Standalone)
+	{
+		UGameplayStatics::OpenLevel(World, FName(LobbyMapPath));
+		return;
+	}
+
+	const FString LobbyURL = BuildServerTravelURL(LobbyMapPath, LobbyTravelOptions);
+	UE_LOG(LogTemp, Log, TEXT("ServerTravel -> %s"), *LobbyURL);
+	TravelOnServer(World, LobbyURL);
 }
 
 void UMapTravelManager::TravelToGameMap(const FString& MapName)
@@ -51,51 +95,47 @@ void UMapTravelManager::TravelToGameMap(const FString& MapName)
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	UE_LOG(LogTemp, Log, TEXT("Traveling to Game Map: %s"), *MapName);
-    
-	// 게임플레이 맵으로 이동
-	UGameplayStatics::OpenLevel(World, FName(*MapName), true, TEXT("listen"));
+	const ENetMode NetMode = World->GetNetMode();
+
+	if (NetMode == NM_Client)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TravelToGameMap은 서버 또는 스탠드얼론 환경에서만 호출해야 합니다."));
+		return;
+	}
+
+	if (NetMode == NM_Standalone)
+	{
+		UGameplayStatics::OpenLevel(World, FName(*MapName));
+		return;
+	}
+
+	const FString TargetURL = MapName.Contains(TEXT("?")) ? MapName : BuildServerTravelURL(*MapName, TEXT(""));
+	UE_LOG(LogTemp, Log, TEXT("ServerTravel -> %s"), *TargetURL);
+	TravelOnServer(World, TargetURL);
 }
 
 void UMapTravelManager::TravelFromRobbyToGame()
 {
 	UWorld* World = GetWorld();
-	if (!World) 
+	if (!World) return;
+
+	const ENetMode NetMode = World->GetNetMode();
+
+	if (NetMode == NM_Client)
 	{
-		UE_LOG(LogTemp, Error, TEXT("World가 유효하지 않습니다."));
+		UE_LOG(LogTemp, Warning, TEXT("TravelFromRobbyToGame은 서버에서 호출해야 합니다. 클라이언트에서는 자동으로 따라갑니다."));
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Traveling from RobbyMap to GameMap"));
-    
-	// GameMap으로 이동
-	// TravelToLobby와 동일한 방식: 맵 이름만 사용
-	// DefaultEngine.ini의 GameModeMapPrefixes에 "GameMap"이 등록되어 있음
-	FString MapName = TEXT("GameMap");
-	
-	// ServerTravel을 항상 사용 (LobbyPlayerController와 동일한 방식)
-	// ServerTravel은 서버가 아니어도 작동하며, 더 안정적임
-	FString ServerURL = MapName + TEXT("?listen");
-	
-	// World가 서버 역할을 할 수 있는지 확인
-	if (World->GetNetMode() == NM_Standalone || World->GetNetMode() == NM_ListenServer || World->GetNetMode() == NM_DedicatedServer)
+	if (NetMode == NM_Standalone)
 	{
-		World->ServerTravel(ServerURL);
-		UE_LOG(LogTemp, Log, TEXT("ServerTravel 사용: %s"), *ServerURL);
+		UGameplayStatics::OpenLevel(World, FName(GameMapPath));
+		return;
 	}
-	else
-	{
-		// 클라이언트 모드인 경우 OpenLevel 사용 (TravelToLobby와 동일한 방식)
-		FName LevelName = FName(*MapName);
-		if (LevelName.IsNone())
-		{
-			UE_LOG(LogTemp, Error, TEXT("맵 이름이 None입니다: %s"), *MapName);
-			return;
-		}
-		
-		UGameplayStatics::OpenLevel(World, LevelName, true, TEXT("listen"));
-		UE_LOG(LogTemp, Log, TEXT("OpenLevel 사용 (Listen Server 모드): %s"), *MapName);
-	}
+
+	const FString GameURL = BuildServerTravelURL(GameMapPath, GameTravelOptions);
+	UE_LOG(LogTemp, Log, TEXT("ServerTravel -> %s"), *GameURL);
+	TravelOnServer(World, GameURL);
 }
 
 void UMapTravelManager::ConsoleCommand_TravelToGame(const TArray<FString>& Args, UWorld* World)
@@ -108,6 +148,13 @@ void UMapTravelManager::ConsoleCommand_TravelToGame(const TArray<FString>& Args,
 
 	if (UMapTravelManager* TravelManager = World->GetGameInstance()->GetSubsystem<UMapTravelManager>())
 	{
+		ENetMode NetMode = World->GetNetMode();
+		if (NetMode == NM_Client)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("TravelToGame 콘솔 명령은 서버 콘솔에서만 사용 가능합니다."));
+			return;
+		}
+
 		TravelManager->TravelFromRobbyToGame();
 	}
 	else
@@ -126,6 +173,13 @@ void UMapTravelManager::ConsoleCommand_TravelToLobby(const TArray<FString>& Args
 
 	if (UMapTravelManager* TravelManager = World->GetGameInstance()->GetSubsystem<UMapTravelManager>())
 	{
+		ENetMode NetMode = World->GetNetMode();
+		if (NetMode == NM_Client)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("TravelToLobby 콘솔 명령은 서버 콘솔에서만 사용 가능합니다."));
+			return;
+		}
+
 		TravelManager->TravelToLobby();
 	}
 	else
