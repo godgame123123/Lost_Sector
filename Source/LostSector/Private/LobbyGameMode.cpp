@@ -1,15 +1,10 @@
 #include "LobbyGameMode.h"
+
 #include "ServerDataManager.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
-#include "Kismet/GameplayStatics.h"
 
-/*
-ALobbyGameMode::ALobbyGameMode()
-{
-    bUseSeamlessTravel = true;
-}
-*/
+
 void ALobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
     Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
@@ -40,8 +35,8 @@ ALobbyGameMode::ALobbyGameMode()
         PlayerStateClass = PlayerStateClassFinder.Class;
     }
 }
-/*
-//void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
+
+void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
 
@@ -86,4 +81,3 @@ void ALobbyGameMode::TransitionToFieldMap(APlayerController* PlayerController, c
     // 클라이언트를 필드맵으로 이동
     PlayerController->ClientTravel(MapName, TRAVEL_Absolute);
 }
-*/

@@ -8,6 +8,7 @@
 			"Name": "LostSector",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
+			  "ServerOnly": false,
 			"AdditionalDependencies": [
 				"Engine",
 				"UMG",
