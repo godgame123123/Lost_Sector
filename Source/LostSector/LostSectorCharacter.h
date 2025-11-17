@@ -43,6 +43,8 @@ class ALostSectorCharacter : public ACharacter
 	/** Look Input Action */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* LookAction;
+
+
 public:
 	ALostSectorCharacter();
 
@@ -61,6 +63,7 @@ public:
 	// Blueprint에서 호출할 함수 (Left Shift Pressed/Released에서 호출)
 	UFUNCTION(BlueprintCallable, Category = "Stamina")
 	void SetIsSprinting(bool bNewState);
+	
 private:
 	FTimerHandle StaminaTimerHandle;
 	UFUNCTION()
@@ -87,6 +90,23 @@ private:
 	// 배고픔 0일 때 체력 감소 속도: 1초당 10씩 감소 (0.1틱당 1)
 	const int32 HealthDrainPerTick = 1;
 	// 배고픔/체력 로직 추가 끝 
+public:
+	// 현재 장착된 무기 액터를 보관할 포인터
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TObjectPtr<class AWeapon> CurrentWeapon;
+
+	// 블루프린트에서 어떤 무기를 장착할지 설정할 수 있도록 UPROPERTY 노출
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TSubclassOf<class AWeapon> DefaultWeaponClass;
+
+	// 무기를 스폰하고 캐릭터에게 부착하는 함수
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void EquipWeapon();
+
+	// 현재 무기의 Fire() 함수를 호출 (Input 연결용)
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void StartFire();
+
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
