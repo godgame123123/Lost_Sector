@@ -16,7 +16,6 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	// ✅ Dedicated Server 전용 초기화
 	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 
 public:

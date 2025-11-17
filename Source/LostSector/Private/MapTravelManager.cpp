@@ -6,15 +6,17 @@
 
 namespace
 {
+	// ServerTravel은 맵 이름만 사용 (DefaultEngine.ini의 GameModeMapPrefixes에 등록된 이름)
+	const TCHAR* LobbyMapName = TEXT("RobbyMap");
+	const TCHAR* GameMapName = TEXT("GameMap");
+	
+	// OpenLevel용 전체 경로 (확장자 없음)
 	const TCHAR* LobbyMapPath = TEXT("/Game/BattleRoyaleStarterKit/Maps/BattleRoyale_Map_a/RobbyMap");
-	const TCHAR* LobbyTravelOptions = TEXT("?listen");
-
 	const TCHAR* GameMapPath = TEXT("/Game/BattleRoyaleStarterKit/Maps/BattleRoyale_Map_a/GameMap");
-	const TCHAR* GameTravelOptions = TEXT("?game=/Script/LostSector.RaidGameMode");
 
-	FString BuildServerTravelURL(const TCHAR* MapPath, const TCHAR* Options)
+	FString BuildServerTravelURL(const TCHAR* MapName, const TCHAR* Options)
 	{
-		FString URL(MapPath);
+		FString URL(MapName);
 		if (Options && *Options)
 		{
 			URL += Options;
@@ -25,7 +27,8 @@ namespace
 	bool TravelOnServer(UWorld* World, const FString& URL)
 	{
 		const ENetMode NetMode = World->GetNetMode();
-		if (NetMode == NM_DedicatedServer || NetMode == NM_ListenServer)
+		// P2P 멀티플레이어는 Listen Server만 사용
+		if (NetMode == NM_ListenServer)
 		{
 			World->ServerTravel(URL);
 			return true;
@@ -81,11 +84,12 @@ void UMapTravelManager::TravelToLobby()
 
 	if (NetMode == NM_Standalone)
 	{
-		UGameplayStatics::OpenLevel(World, FName(LobbyMapPath));
+		UGameplayStatics::OpenLevel(World, FName(LobbyMapName), true, TEXT("listen"));
 		return;
 	}
 
-	const FString LobbyURL = BuildServerTravelURL(LobbyMapPath, LobbyTravelOptions);
+	// ServerTravel은 맵 이름만 사용
+	const FString LobbyURL = BuildServerTravelURL(LobbyMapName, TEXT("?listen"));
 	UE_LOG(LogTemp, Log, TEXT("ServerTravel -> %s"), *LobbyURL);
 	TravelOnServer(World, LobbyURL);
 }
@@ -129,11 +133,12 @@ void UMapTravelManager::TravelFromRobbyToGame()
 
 	if (NetMode == NM_Standalone)
 	{
-		UGameplayStatics::OpenLevel(World, FName(GameMapPath));
+		UGameplayStatics::OpenLevel(World, FName(GameMapName), true, TEXT("listen"));
 		return;
 	}
 
-	const FString GameURL = BuildServerTravelURL(GameMapPath, GameTravelOptions);
+	// ServerTravel은 맵 이름만 사용 (GameMode는 DefaultEngine.ini의 GameModeMapPrefixes에서 자동 설정됨)
+	const FString GameURL = BuildServerTravelURL(GameMapName, TEXT(""));
 	UE_LOG(LogTemp, Log, TEXT("ServerTravel -> %s"), *GameURL);
 	TravelOnServer(World, GameURL);
 }

@@ -36,12 +36,6 @@ void ALostSectorGameMode::InitGame(const FString& MapName, const FString& Option
 	Super::InitGame(MapName, Options, ErrorMessage);
 	
 	UE_LOG(LogTemp, Log, TEXT("🎮 GameMode initialized on map: %s"), *MapName);
-	
-	// Dedicated Server인지 확인
-	if (GetNetMode() == NM_DedicatedServer)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("🖥️ Running as Dedicated Server"));
-	}
 }
 
 void ALostSectorGameMode::PostLogin(APlayerController* NewPlayer)
