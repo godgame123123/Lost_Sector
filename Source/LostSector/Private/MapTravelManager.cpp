@@ -27,7 +27,8 @@ namespace
 	bool TravelOnServer(UWorld* World, const FString& URL)
 	{
 		const ENetMode NetMode = World->GetNetMode();
-		if (NetMode == NM_DedicatedServer || NetMode == NM_ListenServer)
+		// P2P 멀티플레이어는 Listen Server만 사용
+		if (NetMode == NM_ListenServer)
 		{
 			World->ServerTravel(URL);
 			return true;
