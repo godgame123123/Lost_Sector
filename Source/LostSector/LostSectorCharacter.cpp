@@ -10,6 +10,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "Weapon.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -60,7 +61,30 @@ ALostSectorCharacter::ALostSectorCharacter()
 	
 }
 
-void ALostSectorCharacter::BeginPlay()
+// Input
+
+void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	// Set up action bindings
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
+		// Jumping
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+		// Moving
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Move);
+		// Looking
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Look);
+	}
+	else
+	{
+		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+	}
+	
+
+}
+
+// To add mapping context
+inline void ALostSectorCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
@@ -89,27 +113,7 @@ void ALostSectorCharacter::BeginPlay()
 		0.1f, // 틱 간격
 		true
 	);
-
-}
-// Input
-
-void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
-		// Moving
-		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Move);
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Look);
-	}
-	else
-	{
-		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
-	}
-
+	EquipWeapon();
 }
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
@@ -136,7 +140,6 @@ void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 	}
 	bIsSprinting = bNewState;
 }
-
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
 	// MaxStamina 값을 FCharacterData에 추가하지 않았다면, 임시 Max 값 사용 (예시)
@@ -230,6 +233,47 @@ void ALostSectorCharacter::HungerDrainTick()
 			// (선택) 로그 출력 시 포맷 지정자 %f로 변경
 			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
 		}
+	}
+}
+
+void ALostSectorCharacter::EquipWeapon()
+{
+	if (!DefaultWeaponClass)
+	{
+		return;
+	}
+
+	// 1. 무기 스폰
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this; // 캐릭터를 Owner로 설정
+	SpawnParams.Instigator = GetInstigator();
+
+	CurrentWeapon = GetWorld()->SpawnActor<AWeapon>(DefaultWeaponClass, SpawnParams);
+
+	if (CurrentWeapon)
+	{
+		// 2. 캐릭터의 스켈레탈 메쉬에 부착
+		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+		{
+			const FName WeaponSocketName = FName("WeaponSocket"); // <- 스켈레탈 메쉬의 소켓 이름으로 변경하세요!
+
+			CurrentWeapon->AttachToComponent(
+				CharacterMesh,
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				WeaponSocketName
+			);
+
+			// 3. 무기의 Instigator를 이 캐릭터로 설정 (데미지 ApplyDamage에서 사용됨)
+			CurrentWeapon->SetInstigator(this);
+		}
+	}
+}
+
+void ALostSectorCharacter::StartFire()
+{
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->Fire();
 	}
 }
 
