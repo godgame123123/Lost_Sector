@@ -19,7 +19,7 @@ AWeapon::AWeapon()
     MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzleLocation"));
     MuzzleLocation->SetupAttachment(WeaponMesh.Get());
 
-    
+    NoiseRange = 5000.0f;
 }
 
 void AWeapon::BeginPlay()
@@ -99,7 +99,7 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
     // TODO: 총구 화염 (Muzzle Flash) 및 탄피 배출 이펙트 생성
 }
 
-void AWeapon::Fire()
+void AWeapon::Fire(FVector Direction)
 {
     if (!bCanFire || CurrentAmmo <= 0)
     {
@@ -121,14 +121,9 @@ void AWeapon::Fire()
     // ----------------------------------------------------
     FVector StartLocation = MuzzleLocation->GetComponentLocation();
 
-    // 무기 액터의 정면 방향을 발사 방향으로 사용
-    FVector FireDirection = WeaponMesh->GetForwardVector();
+    PerformLineTrace(StartLocation, Direction);
 
-    // 만약 플레이어의 마우스 방향으로 쏘게 하려면, 
-    // 캐릭터 컨트롤러에서 마우스 커서 위치를 가져와 Direction을 재계산해야 합니다.
-    // (현재는 기본: 무기가 바라보는 방향)
-
-    PerformLineTrace(StartLocation, FireDirection);
+    OnFireEvent();
 
     // 연사 속도 타이머 설정
     GetWorld()->GetTimerManager().SetTimer(

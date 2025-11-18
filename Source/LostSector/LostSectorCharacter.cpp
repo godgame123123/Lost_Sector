@@ -27,7 +27,7 @@ ALostSectorCharacter::ALostSectorCharacter()
 	bUseControllerRotationRoll = false;
 
 	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input...
+	GetCharacterMovement()->bOrientRotationToMovement = false; // Character moves in the direction of input...
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f); // ...at this rotation rate
 
 	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
@@ -89,9 +89,16 @@ inline void ALostSectorCharacter::BeginPlay()
 	// Call the base class  
 	Super::BeginPlay();
 
+
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
+		// 마우스 커서 표시
+		PlayerController->bShowMouseCursor = true;
+
+		// 마우스 클릭이 월드와 UI에 모두 영향을 미치도록 설정
+		PlayerController->SetInputMode(FInputModeGameAndUI());
+
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
@@ -114,6 +121,87 @@ inline void ALostSectorCharacter::BeginPlay()
 		true
 	);
 	EquipWeapon();
+}
+void ALostSectorCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// 1. 캐릭터 무브먼트 컴포넌트를 가져옵니다.
+	UCharacterMovementComponent* MovementComp = GetCharacterMovement();
+
+	if (bIsSprinting)
+	{
+		// [뛸 때 로직]
+		// 움직임 방향으로 회전하도록 Unreal Engine의 기본 기능(bOrientRotationToMovement)을 활성화합니다.
+		if (MovementComp && !MovementComp->bOrientRotationToMovement)
+		{
+			MovementComp->bOrientRotationToMovement = true;
+		}
+
+		// 달리는 중에는 마우스 회전 로직을 건너뜁니다.
+		return;
+	}
+	else // 걷거나 멈춰있을 때 (bIsSprinting == false)
+	{
+		// [걷거나 멈춰있을 때 로직]
+		// 마우스 커서 방향으로 수동 회전하기 위해 Unreal Engine의 자동 회전 기능을 비활성화합니다.
+		if (MovementComp && MovementComp->bOrientRotationToMovement)
+		{
+			MovementComp->bOrientRotationToMovement = false;
+		}
+
+		// --- 마우스 커서 방향으로 회전시키는 기존 수동 로직 시작 ---
+
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (!PC)
+		{
+			return;
+		}
+
+		FVector WorldLocation, WorldDirection;
+		PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+
+		FHitResult HitResult;
+		FVector StartTrace = WorldLocation;
+		FVector EndTrace = WorldLocation + WorldDirection * 50000.0f;
+
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+
+		bool bHit = GetWorld()->LineTraceSingleByChannel(
+			HitResult,
+			StartTrace,
+			EndTrace,
+			ECollisionChannel::ECC_WorldStatic,
+			Params
+		);
+
+		FVector TargetLocation = bHit ? HitResult.Location : EndTrace;
+
+		// 현재 위치에서 타겟 위치를 바라보는 방향을 계산합니다. (Z축 무시)
+		FVector CurrentLocation = GetActorLocation();
+		FVector Direction = TargetLocation - CurrentLocation;
+		Direction.Z = 0.0f;
+		Direction.Normalize();
+
+		FRotator TargetRotation = Direction.Rotation();
+
+		FRotator CurrentRotation = GetActorRotation();
+		float RotationSpeed = 10.0f;
+
+		// 부드럽게 보간하여 회전을 적용합니다.
+		FRotator NewRotation = FMath::RInterpTo(
+			CurrentRotation,
+			TargetRotation,
+			DeltaTime,
+			RotationSpeed
+		);
+
+		// 캐릭터의 회전을 Yaw 값으로 업데이트합니다.
+		SetActorRotation(FRotator(0.0f, NewRotation.Yaw, 0.0f));
+
+		// --- 마우스 커서 방향으로 회전시키는 기존 수동 로직 끝 ---
+	}
 }
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
@@ -271,10 +359,62 @@ void ALostSectorCharacter::EquipWeapon()
 
 void ALostSectorCharacter::StartFire()
 {
-	if (CurrentWeapon)
+
+	if (bIsSprinting)
 	{
-		CurrentWeapon->Fire();
+		UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: Cannot fire while sprinting."));
+		return;
 	}
+
+	if (!CurrentWeapon)
+	{
+		return;
+	}
+
+	// 1. 플레이어 컨트롤러를 가져옵니다.
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	// 2. 마우스 커서의 스크린 위치를 월드 좌표계의 광선(Ray)으로 변환합니다.
+	FVector WorldLocation, WorldDirection;
+	PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
+
+	// 3. 마우스 광선으로 지면을 향해 트레이스하여 타겟 지면 좌표를 찾습니다.
+	FHitResult HitResult;
+	FVector StartTrace = WorldLocation;
+	// 트레이스 길이는 충분히 길게 설정합니다.
+	FVector EndTrace = WorldLocation + WorldDirection * 50000.0f;
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	// ECollisionChannel::ECC_WorldStatic 채널로 트레이스하여 지면만 탐지합니다.
+	bool bHit = GetWorld()->LineTraceSingleByChannel(
+		HitResult,
+		StartTrace,
+		EndTrace,
+		ECollisionChannel::ECC_WorldStatic,
+		Params
+	);
+
+	FVector TargetLocation = bHit ? HitResult.Location : EndTrace; // 지면에 닿았으면 닿은 위치, 아니면 트레이스 끝점
+
+	// 4. 총구 위치를 가져옵니다. (AWeapon에 GetMuzzleLocation() 함수가 있어야 합니다. 아래 참고)
+	USceneComponent* MuzzleComp = CurrentWeapon->GetMuzzleLocation();
+	if (!MuzzleComp)
+	{
+		return;
+	}
+	FVector MuzzleLocation = MuzzleComp->GetComponentLocation();
+
+	// 5. 총구 위치에서 타겟 지점을 바라보는 방향을 최종 발사 방향으로 계산합니다.
+	FVector FireDirection = (TargetLocation - MuzzleLocation).GetSafeNormal();
+
+	// 6. 계산된 방향으로 Fire 함수 호출
+	CurrentWeapon->Fire(FireDirection);
 }
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)
