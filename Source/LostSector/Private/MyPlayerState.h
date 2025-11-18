@@ -52,9 +52,14 @@ public:
     // 클라이언트 → 서버: 아이템 제거 요청
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_RemoveItemFromStash(int32 Index);
-    
-    UFUNCTI
-    
+
+    UFUNCTION(Server, Reliable, WithValidation)
+    void UpgradeStat(EStatTypes StatType, int Amount);
+
+    virtual bool UpgradeStat_Validate(EStatTypes StatType, int Amount);
+    virtual void UpgradeStat_Implementation(EStatTypes StatType, int Amount);
+
+
 protected:
     // 리플리케이션 콜백
     UFUNCTION()

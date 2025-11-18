@@ -140,9 +140,15 @@ void AMyPlayerState::OnRep_Money()
     UE_LOG(LogTemp, Log, TEXT("Money updated: %d"), Money);
 }
 
-void AMyPlayerState::UpgradeStat(EStatTypes Stat, int32 Amount)
+bool AMyPlayerState::UpgradeStat_Validate(EStatTypes StatType, int Amount)
 {
-    // 기존 코드 유지
+    return true; // 무조건 true로 해도 됨 (조건 추가 가능)
+}
+
+void AMyPlayerState::UpgradeStat_Implementation(EStatTypes StatType, int Amount)
+{
+    // 실제 코드 작성
+    UE_LOG(LogTemp, Warning, TEXT("Stat 업그레이드 실행!"));
 }
 
 void AMyPlayerState::Server_ClearInventoryOnDeath_Implementation()
