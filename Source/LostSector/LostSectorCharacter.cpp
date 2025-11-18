@@ -11,7 +11,11 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Weapon.h"
-
+#include "MyPlayerState.h"
+#include "InventoryComponent.h"
+#include "InventorySaveManager.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -52,7 +56,7 @@ ALostSectorCharacter::ALostSectorCharacter()
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 	
-	// Ä³¸¯ÅÍ »ı¼º ½Ã ±âº» Stats °ª
+	// Ä³ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½âº» Stats ï¿½ï¿½
 	CharacterStats.Hp = 100.0f;
 	CharacterStats.Stamina = 100.0f;
 	CharacterStats.hungry = 100.0f;
@@ -84,7 +88,7 @@ void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 }
 
 // To add mapping context
-inline void ALostSectorCharacter::BeginPlay()
+void ALostSectorCharacter::BeginPlay()
 {
 	// Call the base class  
 	Super::BeginPlay();
@@ -93,10 +97,10 @@ inline void ALostSectorCharacter::BeginPlay()
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
-		// ¸¶¿ì½º Ä¿¼­ Ç¥½Ã
+		// ï¿½ï¿½ï¿½ì½º Ä¿ï¿½ï¿½ Ç¥ï¿½ï¿½
 		PlayerController->bShowMouseCursor = true;
 
-		// ¸¶¿ì½º Å¬¸¯ÀÌ ¿ùµå¿Í UI¿¡ ¸ğµÎ ¿µÇâÀ» ¹ÌÄ¡µµ·Ï ¼³Á¤
+		// ï¿½ï¿½ï¿½ì½º Å¬ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ UIï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		PlayerController->SetInputMode(FInputModeGameAndUI());
 
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -109,15 +113,15 @@ inline void ALostSectorCharacter::BeginPlay()
 		StaminaTimerHandle,
 		this,
 		&ALostSectorCharacter::StaminaRegenDrainTick,
-		0.1f, // Æ½ °£°İ
-		true  // ¹İº¹
+		0.1f, // Æ½ ï¿½ï¿½ï¿½ï¿½
+		true  // ï¿½İºï¿½
 	);
 
 	GetWorldTimerManager().SetTimer(
 		HungerTimerHandle,
 		this,
 		&ALostSectorCharacter::HungerDrainTick,
-		0.1f, // Æ½ °£°İ
+		0.1f, // Æ½ ï¿½ï¿½ï¿½ï¿½
 		true
 	);
 	EquipWeapon();
@@ -126,31 +130,31 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 1. Ä³¸¯ÅÍ ¹«ºê¸ÕÆ® ÄÄÆ÷³ÍÆ®¸¦ °¡Á®¿É´Ï´Ù.
+	// 1. Ä³ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É´Ï´ï¿½.
 	UCharacterMovementComponent* MovementComp = GetCharacterMovement();
 
 	if (bIsSprinting)
 	{
-		// [¶Û ¶§ ·ÎÁ÷]
-		// ¿òÁ÷ÀÓ ¹æÇâÀ¸·Î È¸ÀüÇÏµµ·Ï Unreal EngineÀÇ ±âº» ±â´É(bOrientRotationToMovement)À» È°¼ºÈ­ÇÕ´Ï´Ù.
+		// [ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½]
+		// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½Ïµï¿½ï¿½ï¿½ Unreal Engineï¿½ï¿½ ï¿½âº» ï¿½ï¿½ï¿½(bOrientRotationToMovement)ï¿½ï¿½ È°ï¿½ï¿½È­ï¿½Õ´Ï´ï¿½.
 		if (MovementComp && !MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = true;
 		}
 
-		// ´Ş¸®´Â Áß¿¡´Â ¸¶¿ì½º È¸Àü ·ÎÁ÷À» °Ç³Ê¶İ´Ï´Ù.
+		// ï¿½Ş¸ï¿½ï¿½ï¿½ ï¿½ß¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ì½º È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ç³Ê¶İ´Ï´ï¿½.
 		return;
 	}
-	else // °È°Å³ª ¸ØÃçÀÖÀ» ¶§ (bIsSprinting == false)
+	else // ï¿½È°Å³ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ (bIsSprinting == false)
 	{
-		// [°È°Å³ª ¸ØÃçÀÖÀ» ¶§ ·ÎÁ÷]
-		// ¸¶¿ì½º Ä¿¼­ ¹æÇâÀ¸·Î ¼öµ¿ È¸ÀüÇÏ±â À§ÇØ Unreal EngineÀÇ ÀÚµ¿ È¸Àü ±â´ÉÀ» ºñÈ°¼ºÈ­ÇÕ´Ï´Ù.
+		// [ï¿½È°Å³ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½]
+		// ï¿½ï¿½ï¿½ì½º Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½Ï±ï¿½ ï¿½ï¿½ï¿½ï¿½ Unreal Engineï¿½ï¿½ ï¿½Úµï¿½ È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È°ï¿½ï¿½È­ï¿½Õ´Ï´ï¿½.
 		if (MovementComp && MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = false;
 		}
 
-		// --- ¸¶¿ì½º Ä¿¼­ ¹æÇâÀ¸·Î È¸Àü½ÃÅ°´Â ±âÁ¸ ¼öµ¿ ·ÎÁ÷ ½ÃÀÛ ---
+		// --- ï¿½ï¿½ï¿½ì½º Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ---
 
 		APlayerController* PC = Cast<APlayerController>(GetController());
 		if (!PC)
@@ -178,7 +182,7 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 
 		FVector TargetLocation = bHit ? HitResult.Location : EndTrace;
 
-		// ÇöÀç À§Ä¡¿¡¼­ Å¸°Ù À§Ä¡¸¦ ¹Ù¶óº¸´Â ¹æÇâÀ» °è»êÇÕ´Ï´Ù. (ZÃà ¹«½Ã)
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½Ù¶óº¸´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½. (Zï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 		FVector CurrentLocation = GetActorLocation();
 		FVector Direction = TargetLocation - CurrentLocation;
 		Direction.Z = 0.0f;
@@ -189,7 +193,7 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 		FRotator CurrentRotation = GetActorRotation();
 		float RotationSpeed = 10.0f;
 
-		// ºÎµå·´°Ô º¸°£ÇÏ¿© È¸ÀüÀ» Àû¿ëÇÕ´Ï´Ù.
+		// ï¿½Îµå·´ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ È¸ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 		FRotator NewRotation = FMath::RInterpTo(
 			CurrentRotation,
 			TargetRotation,
@@ -197,80 +201,80 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 			RotationSpeed
 		);
 
-		// Ä³¸¯ÅÍÀÇ È¸ÀüÀ» Yaw °ªÀ¸·Î ¾÷µ¥ÀÌÆ®ÇÕ´Ï´Ù.
+		// Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½ Yaw ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½Õ´Ï´ï¿½.
 		SetActorRotation(FRotator(0.0f, NewRotation.Yaw, 0.0f));
 
-		// --- ¸¶¿ì½º Ä¿¼­ ¹æÇâÀ¸·Î È¸Àü½ÃÅ°´Â ±âÁ¸ ¼öµ¿ ·ÎÁ÷ ³¡ ---
+		// --- ï¿½ï¿½ï¿½ì½º Ä¿ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ï¿½ï¿½Å°ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ---
 	}
 }
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
-	// 1. Stamina°¡ ºñ¿ëº¸´Ù Å©°Å³ª °°ÀºÁö È®ÀÎ
+	// 1. Staminaï¿½ï¿½ ï¿½ï¿½ëº¸ï¿½ï¿½ Å©ï¿½Å³ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 	if (CharacterStats.Stamina >= StaminaCost)
 	{
-		// 2. Stamina °¨¼Ò
+		// 2. Stamina ï¿½ï¿½ï¿½ï¿½
 		CharacterStats.Stamina -= StaminaCost;
-		// (¼±ÅÃ) µğ¹ö±ë ·Î±× Ãâ·Â
+		// (ï¿½ï¿½ï¿½ï¿½) ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Î±ï¿½ ï¿½ï¿½ï¿½
 		UE_LOG(LogTemp, Warning, TEXT("Stamina Consumed: %f	. Current Stamina: %f"), StaminaCost, CharacterStats.Stamina);
-		// 3. Stamina ¼Ò¸ğ ¼º°ø
+		// 3. Stamina ï¿½Ò¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 		return true;
 	}
-	// Stamina°¡ ºÎÁ·ÇÏ¿© ¼Ò¸ğ ½ÇÆĞ
+	// Staminaï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ ï¿½Ò¸ï¿½ ï¿½ï¿½ï¿½ï¿½
 	return false;
 }
 void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 {
-	// ´Ş¸®±â »óÅÂ°¡ ÇØÁ¦µÉ ¶§ (True -> False)
+	// ï¿½Ş¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ (True -> False)
 	if (bIsSprinting == true && bNewState == false)
 	{
-		// ÇöÀç ¿ùµå ½Ã°£À» ±â·ÏÇÕ´Ï´Ù.
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 		LastSprintEndTime = GetWorld()->GetTimeSeconds();
 	}
 	bIsSprinting = bNewState;
 }
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
-	// MaxStamina °ªÀ» FCharacterData¿¡ Ãß°¡ÇÏÁö ¾Ê¾Ò´Ù¸é, ÀÓ½Ã Max °ª »ç¿ë (¿¹½Ã)
+	// MaxStamina ï¿½ï¿½ï¿½ï¿½ FCharacterDataï¿½ï¿½ ï¿½ß°ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¾Ò´Ù¸ï¿½, ï¿½Ó½ï¿½ Max ï¿½ï¿½ ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½)
 	const float MaxStamina = 100.0f;
 	float StaminaChange = 0.0f;
-	// ÇöÀç ¿ùµå ½Ã°£ °¡Á®¿À±â
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	const float CurrentTime = GetWorld()->GetTimeSeconds();
-	// Stamina Àç»ı Áö¿¬ ½Ã°£ (ÃÊ)
+	// Stamina ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ (ï¿½ï¿½)
 	const float LastDrainTime = FMath::Max(LastSprintEndTime, LastStaminaZeroTime);
-	// Àç»ı Áö¿¬ ½Ã°£ °è»ê
+	// ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½
 	const float RegenAllowedTime = LastDrainTime + StaminaRegenDelayDuration;
-	// ´Ş¸®±â »óÅÂ Ã¼Å© ¹× Stamina º¯°æ·® °áÁ¤
+	// ï¿½Ş¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Ã¼Å© ï¿½ï¿½ Stamina ï¿½ï¿½ï¿½æ·® ï¿½ï¿½ï¿½ï¿½
 	if (bIsSprinting)
 	{
-		// ´Ş¸± ¶§: Stamina ¼Ò¸ğ (¿¹: Æ½´ç -1)
+		// ï¿½Ş¸ï¿½ ï¿½ï¿½: Stamina ï¿½Ò¸ï¿½ (ï¿½ï¿½: Æ½ï¿½ï¿½ -1)
 		StaminaChange = -1.0f;
 	}
-	else // Æò¼Ò »óÅÂ (Àç»ı ½Ãµµ)
+	else // ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ ï¿½Ãµï¿½)
 	{
-		// Stamina°¡ Maxº¸´Ù ÀÛÀ» ¶§¸¸ Àç»ı ½Ãµµ
+		// Staminaï¿½ï¿½ Maxï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½Ãµï¿½
 		if (CharacterStats.Stamina < MaxStamina)
 		{
-			// Áö¿¬ ½Ã°£ÀÌ Áö³µ´ÂÁö È®ÀÎ
+			// ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
 			if (CurrentTime < RegenAllowedTime)
 			{
-				StaminaChange = 0.0f; // Áö¿¬ ½Ã°£ ÀÌ³»: Àç»ı ¸·À½
+				StaminaChange = 0.0f; // ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½Ì³ï¿½: ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			}
 			else
 			{
-				StaminaChange = 1.0f; // Áö¿¬ ½Ã°£ °æ°ú: Stamina Àç»ı
+				StaminaChange = 1.0f; // ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½: Stamina ï¿½ï¿½ï¿½
 			}
 		}
 	}
-	// FCharacterData::Stamina °ª ¾÷µ¥ÀÌÆ®
+	// FCharacterData::Stamina ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
 	CharacterStats.Stamina += StaminaChange;
 
-	// ÃÖ¼Ò/ÃÖ´ë °ªÀ¸·Î Clamp (0 ÀÌÇÏ, Max ÀÌ»óÀ¸·Î ³Ñ¾î°¡Áö ¾Ê°Ô ¹æÁö)
+	// ï¿½Ö¼ï¿½/ï¿½Ö´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Clamp (0 ï¿½ï¿½ï¿½ï¿½, Max ï¿½Ì»ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ¾î°¡ï¿½ï¿½ ï¿½Ê°ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	CharacterStats.Stamina = FMath::Clamp(CharacterStats.Stamina, 0.0f, MaxStamina);
 
-	// Stamina°¡ 0¿¡ µµ´ŞÇßÀ» ¶§ÀÇ ·ÎÁ÷
+	// Staminaï¿½ï¿½ 0ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	if (CharacterStats.Stamina <= 0.0f)
 	{
-		// °­Á¦ ¿öÅ· ·ÎÁ÷ (Stamina°¡ 0ÀÌ µÇ¸é ´Ş¸®±â »óÅÂ ÇØÁ¦)
+		// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å· ï¿½ï¿½ï¿½ï¿½ (Staminaï¿½ï¿½ 0ï¿½ï¿½ ï¿½Ç¸ï¿½ ï¿½Ş¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 		if (bIsSprinting)
 		{
 			if (GetCharacterMovement())
@@ -279,48 +283,52 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 			}
 			bIsSprinting = false;
 		}
-		// Stamina°¡ 0ÀÎ »óÅÂ¸¦ À¯ÁöÇÒ ¶§ LastStaminaZeroTimeÀ» ÇöÀç ½Ã°£À¸·Î °»½Å
-		// (LastStaminaZeroTimeÀ» °è¼Ó °»½ÅÇÏ¿© 0ÀÎ »óÅÂ¿¡¼­´Â Àç»ıÀÌ ¿µ¿øÈ÷ Â÷´ÜµÇ°Ô ÇÕ´Ï´Ù.)
+		// Staminaï¿½ï¿½ 0ï¿½ï¿½ ï¿½ï¿½ï¿½Â¸ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ LastStaminaZeroTimeï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+		// (LastStaminaZeroTimeï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¿ï¿½ 0ï¿½ï¿½ ï¿½ï¿½ï¿½Â¿ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ÜµÇ°ï¿½ ï¿½Õ´Ï´ï¿½.)
 		if (LastStaminaZeroTime == 0.0f)
 		{
 			LastStaminaZeroTime = CurrentTime;
 		}
 	}
-	// Stamina°¡ 1 ÀÌ»óÀ¸·Î ¿Ã¶ó¿À¸é (Àç»ı °¡´É »óÅÂ°¡ µÇ¸é) LastStaminaZeroTime ÃÊ±âÈ­
-	// (ÀÌ·¸°Ô ÇØ¾ß Áö¿¬ ½Ã°£ÀÌ ³¡³­ ÈÄ Àç»ıÀÌ ½ÃÀÛµÊ°ú µ¿½Ã¿¡ LastStaminaZeroTimeÀÌ °»½ÅµÇÁö ¾Ê½À´Ï´Ù.)
+	// Staminaï¿½ï¿½ 1 ï¿½Ì»ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã¶ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Â°ï¿½ ï¿½Ç¸ï¿½) LastStaminaZeroTime ï¿½Ê±ï¿½È­
+	// (ï¿½Ì·ï¿½ï¿½ï¿½ ï¿½Ø¾ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ÛµÊ°ï¿½ ï¿½ï¿½ï¿½Ã¿ï¿½ LastStaminaZeroTimeï¿½ï¿½ ï¿½ï¿½ï¿½Åµï¿½ï¿½ï¿½ ï¿½Ê½ï¿½ï¿½Ï´ï¿½.)
 	else
 	{
-		LastStaminaZeroTime = 0.0f; // Stamina°¡ 0ÀÌ ¾Æ´Ò ¶§´Â ÃÊ±âÈ­
+		LastStaminaZeroTime = 0.0f; // Staminaï¿½ï¿½ 0ï¿½ï¿½ ï¿½Æ´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ê±ï¿½È­
 	}
 }
 
 void ALostSectorCharacter::HungerDrainTick()
 {
-	// 1. Hunger ¼Ò¸ğ ·ÎÁ÷
-	if (CharacterStats.hungry > 0.0f) // 0.0f¿Í ºñ±³
+	// 1. Hunger ï¿½Ò¸ï¿½ ï¿½ï¿½ï¿½ï¿½
+	if (CharacterStats.hungry > 0.0f) // 0.0fï¿½ï¿½ ï¿½ï¿½
 	{
-		// Æ½´ç ¼Ò¸ğ·® (0.05f)¸¸Å­ Á÷Á¢ °¨¼Ò
+		// Æ½ï¿½ï¿½ ï¿½Ò¸ï¿½ (0.05f)ï¿½ï¿½Å­ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		CharacterStats.hungry -= HungerDrainPerTick;
 
-		// 0.0f ¹Ì¸¸À¸·Î ³»·Á°¡Áö ¾Êµµ·Ï Clamp
+		// 0.0f ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ Clamp
 		CharacterStats.hungry = FMath::Max(0.0f, CharacterStats.hungry);
 	}
 
-	// 2. Hunger°¡ 0ÀÏ ¶§ HP °¨¼Ò ·ÎÁ÷
-	if (CharacterStats.hungry <= 0.0f) // 0.0f¿Í ºñ±³
+	// 2. Hungerï¿½ï¿½ 0ï¿½ï¿½ ï¿½ï¿½ HP ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+	if (CharacterStats.hungry <= 0.0f) // 0.0fï¿½ï¿½ ï¿½ï¿½
 	{
-		// HP°¡ 0.0fº¸´Ù Å¬ ¶§¸¸ HP °¨¼Ò
-		if (CharacterStats.Hp > 0.0f) // 0.0f¿Í ºñ±³
+		// HPï¿½ï¿½ 0.0fï¿½ï¿½ï¿½ï¿½ Å¬ ï¿½ï¿½ï¿½ï¿½ HP ï¿½ï¿½ï¿½ï¿½
+		if (CharacterStats.Hp > 0.0f) // 0.0fï¿½ï¿½ ï¿½ï¿½
 		{
-			// HealthDrainPerTickÀº int32ÀÌÁö¸¸ float ¿¬»ê¿¡ ¹®Á¦ ¾øÀ½
+			// HealthDrainPerTickï¿½ï¿½ int32ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ float ï¿½ï¿½ï¿½ê¿¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			CharacterStats.Hp -= HealthDrainPerTick;
 
-			// HP°¡ 0.0f ¹Ì¸¸À¸·Î ³»·Á°¡Áö ¾Êµµ·Ï Clamp
+			// HPï¿½ï¿½ 0.0f ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Êµï¿½ï¿½ï¿½ Clamp
 			CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
 
-			// (¼±ÅÃ) ·Î±× Ãâ·Â ½Ã Æ÷¸Ë ÁöÁ¤ÀÚ %f·Î º¯°æ
+			// (ï¿½ï¿½ï¿½ï¿½) ï¿½Î±ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ %fï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
 		}
+	}
+	if (CharacterStats.Hp <= 0.0f && !bIsDead)
+	{
+		Die();
 	}
 }
 
@@ -331,19 +339,19 @@ void ALostSectorCharacter::EquipWeapon()
 		return;
 	}
 
-	// 1. ¹«±â ½ºÆù
+	// 1. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this; // Ä³¸¯ÅÍ¸¦ Owner·Î ¼³Á¤
+	SpawnParams.Owner = this; // Ä³ï¿½ï¿½ï¿½Í¸ï¿½ Ownerï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	SpawnParams.Instigator = GetInstigator();
 
 	CurrentWeapon = GetWorld()->SpawnActor<AWeapon>(DefaultWeaponClass, SpawnParams);
 
 	if (CurrentWeapon)
 	{
-		// 2. Ä³¸¯ÅÍÀÇ ½ºÄÌ·¹Å» ¸Ş½¬¿¡ ºÎÂø
+		// 2. Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì·ï¿½Å» ï¿½Ş½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
 		{
-			const FName WeaponSocketName = FName("WeaponSocket"); // <- ½ºÄÌ·¹Å» ¸Ş½¬ÀÇ ¼ÒÄÏ ÀÌ¸§À¸·Î º¯°æÇÏ¼¼¿ä!
+			const FName WeaponSocketName = FName("WeaponSocket"); // <- ï¿½ï¿½ï¿½Ì·ï¿½Å» ï¿½Ş½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¼ï¿½ï¿½ï¿½!
 
 			CurrentWeapon->AttachToComponent(
 				CharacterMesh,
@@ -351,7 +359,7 @@ void ALostSectorCharacter::EquipWeapon()
 				WeaponSocketName
 			);
 
-			// 3. ¹«±âÀÇ Instigator¸¦ ÀÌ Ä³¸¯ÅÍ·Î ¼³Á¤ (µ¥¹ÌÁö ApplyDamage¿¡¼­ »ç¿ëµÊ)
+			// 3. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Instigatorï¿½ï¿½ ï¿½ï¿½ Ä³ï¿½ï¿½ï¿½Í·ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ApplyDamageï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 			CurrentWeapon->SetInstigator(this);
 		}
 	}
@@ -371,27 +379,27 @@ void ALostSectorCharacter::StartFire()
 		return;
 	}
 
-	// 1. ÇÃ·¹ÀÌ¾î ÄÁÆ®·Ñ·¯¸¦ °¡Á®¿É´Ï´Ù.
+	// 1. ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ ï¿½ï¿½Æ®ï¿½Ñ·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É´Ï´ï¿½.
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC)
 	{
 		return;
 	}
 
-	// 2. ¸¶¿ì½º Ä¿¼­ÀÇ ½ºÅ©¸° À§Ä¡¸¦ ¿ùµå ÁÂÇ¥°èÀÇ ±¤¼±(Ray)À¸·Î º¯È¯ÇÕ´Ï´Ù.
+	// 2. ï¿½ï¿½ï¿½ì½º Ä¿ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Å©ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½(Ray)ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½È¯ï¿½Õ´Ï´ï¿½.
 	FVector WorldLocation, WorldDirection;
 	PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
 
-	// 3. ¸¶¿ì½º ±¤¼±À¸·Î Áö¸éÀ» ÇâÇØ Æ®·¹ÀÌ½ºÇÏ¿© Å¸°Ù Áö¸é ÁÂÇ¥¸¦ Ã£½À´Ï´Ù.
+	// 3. ï¿½ï¿½ï¿½ì½º ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ï¿½Ï¿ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ç¥ï¿½ï¿½ Ã£ï¿½ï¿½ï¿½Ï´ï¿½.
 	FHitResult HitResult;
 	FVector StartTrace = WorldLocation;
-	// Æ®·¹ÀÌ½º ±æÀÌ´Â ÃæºĞÈ÷ ±æ°Ô ¼³Á¤ÇÕ´Ï´Ù.
+	// Æ®ï¿½ï¿½ï¿½Ì½ï¿½ ï¿½ï¿½ï¿½Ì´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 	FVector EndTrace = WorldLocation + WorldDirection * 50000.0f;
 
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
 
-	// ECollisionChannel::ECC_WorldStatic Ã¤³Î·Î Æ®·¹ÀÌ½ºÇÏ¿© Áö¸é¸¸ Å½ÁöÇÕ´Ï´Ù.
+	// ECollisionChannel::ECC_WorldStatic Ã¤ï¿½Î·ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ï¿½Ï¿ï¿½ ï¿½ï¿½ï¿½é¸¸ Å½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 	bool bHit = GetWorld()->LineTraceSingleByChannel(
 		HitResult,
 		StartTrace,
@@ -400,9 +408,9 @@ void ALostSectorCharacter::StartFire()
 		Params
 	);
 
-	FVector TargetLocation = bHit ? HitResult.Location : EndTrace; // Áö¸é¿¡ ´ê¾ÒÀ¸¸é ´êÀº À§Ä¡, ¾Æ´Ï¸é Æ®·¹ÀÌ½º ³¡Á¡
+	FVector TargetLocation = bHit ? HitResult.Location : EndTrace; // ï¿½ï¿½ï¿½é¿¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡, ï¿½Æ´Ï¸ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-	// 4. ÃÑ±¸ À§Ä¡¸¦ °¡Á®¿É´Ï´Ù. (AWeapon¿¡ GetMuzzleLocation() ÇÔ¼ö°¡ ÀÖ¾î¾ß ÇÕ´Ï´Ù. ¾Æ·¡ Âü°í)
+	// 4. ï¿½Ñ±ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½É´Ï´ï¿½. (AWeaponï¿½ï¿½ GetMuzzleLocation() ï¿½Ô¼ï¿½ï¿½ï¿½ ï¿½Ö¾ï¿½ï¿½ ï¿½Õ´Ï´ï¿½. ï¿½Æ·ï¿½ ï¿½ï¿½ï¿½ï¿½)
 	USceneComponent* MuzzleComp = CurrentWeapon->GetMuzzleLocation();
 	if (!MuzzleComp)
 	{
@@ -410,10 +418,10 @@ void ALostSectorCharacter::StartFire()
 	}
 	FVector MuzzleLocation = MuzzleComp->GetComponentLocation();
 
-	// 5. ÃÑ±¸ À§Ä¡¿¡¼­ Å¸°Ù ÁöÁ¡À» ¹Ù¶óº¸´Â ¹æÇâÀ» ÃÖÁ¾ ¹ß»ç ¹æÇâÀ¸·Î °è»êÇÕ´Ï´Ù.
+	// 5. ï¿½Ñ±ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ï¿½ï¿½ Å¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ù¶óº¸´ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
 	FVector FireDirection = (TargetLocation - MuzzleLocation).GetSafeNormal();
 
-	// 6. °è»êµÈ ¹æÇâÀ¸·Î Fire ÇÔ¼ö È£Ãâ
+	// 6. ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Fire ï¿½Ô¼ï¿½ È£ï¿½ï¿½
 	CurrentWeapon->Fire(FireDirection);
 }
 
@@ -450,5 +458,63 @@ void ALostSectorCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void ALostSectorCharacter::Die()
+{
+	// ì´ë¯¸ ì£½ì—ˆìœ¼ë©´ ì¤‘ë³µ ì‹¤í–‰ ë°©ì§€
+	if (bIsDead)
+	{
+		return;
+	}
+	
+	bIsDead = true;
+	
+	UE_LOG(LogTemp, Warning, TEXT("ğŸ’€ Player %s has died!"), *GetName());
+	
+	// ì„œë²„ì—ì„œë§Œ ì‹¤í–‰
+	if (HasAuthority())
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (!PC || !PC->PlayerState)
+		{
+			return;
+		}
+		
+		FString PlayerID;
+		if (PC->PlayerState->GetUniqueId().IsValid())
+		{
+			PlayerID = PC->PlayerState->GetUniqueId()->ToString();
+		}
+		else
+		{
+			PlayerID = FString::Printf(TEXT("Local_%d"), PC->PlayerState->GetPlayerId());
+		}
+		
+		// 1. MyPlayerStateì˜ ì¸ë²¤í† ë¦¬ ì´ˆê¸°í™”
+		if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
+		{
+			// ì„œë²„ì—ì„œ ì§ì ‘ í˜¸ì¶œ - RPCë¥¼ í˜¸ì¶œí•˜ë©´ ìë™ìœ¼ë¡œ Implementationì´ ì‹¤í–‰ë¨
+			MyPS->Server_ClearInventoryOnDeath();
+		}
+		
+		// 2. InventoryComponentì˜ ì¸ë²¤í† ë¦¬ ì´ˆê¸°í™”
+		if (UInventoryComponent* InventoryComp = FindComponentByClass<UInventoryComponent>())
+		{
+			int32 RemovedCount = InventoryComp->Slots.Num();
+			InventoryComp->Slots.Empty();
+			InventoryComp->InitSlots(); // ë¹ˆ ìŠ¬ë¡¯ìœ¼ë¡œ ì´ˆê¸°í™”
+			
+			UE_LOG(LogTemp, Warning, TEXT("ğŸ’€ Cleared %d items from InventoryComponent"), RemovedCount);
+			
+			// InventoryComponent ë°ì´í„° ì €ì¥
+			TArray<FItemStack> EmptyStorage;
+			if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, 
+				InventoryComp->Slots, EmptyStorage))
+			{
+				UE_LOG(LogTemp, Log, TEXT("ğŸ’¾ InventoryComponent cleared and saved on death: %s"), *PlayerID);
+			}
+		}
 	}
 }
