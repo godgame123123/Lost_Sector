@@ -325,8 +325,8 @@ void UInventoryComponent::OnRep_Slots()
 
 void UInventoryComponent::BroadcastUpdated()
 {
-    // UI 업데이트 등을 위한 델리게이트 호출
-    // OnInventoryUpdated.Broadcast();
+    // UI 쪽으로 "인벤토리 바뀜" 신호 보내기
+    OnInventoryUpdated.Broadcast();
 }
 
 // ============================================================

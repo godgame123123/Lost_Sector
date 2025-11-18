@@ -7,6 +7,8 @@
 
 class AItemPickup;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryUpdated);
+
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class LOSTSECTOR_API UInventoryComponent : public UActorComponent
 {
@@ -16,6 +18,9 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly) int32 SlotCount = 30;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) float WeightLimit = 30.f;
+
+    UPROPERTY(BlueprintAssignable, Category = "Inventory")
+    FOnInventoryUpdated OnInventoryUpdated;
 
     // ✅ 반드시 UPROPERTY 이어야 DOREPLIFETIME 가능
     UPROPERTY(ReplicatedUsing = OnRep_Slots, BlueprintReadOnly)
