@@ -30,6 +30,9 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Stats")
 	float NoiseRange;               // 소음 범위
 
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Stats")
+    float SpreadAngle = 2.0f;       // 총알 분산 각도
+
     // 총기 외형 (Static Mesh)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
     TObjectPtr<class UStaticMeshComponent> WeaponMesh;
@@ -61,6 +64,13 @@ public:
 protected:
     FTimerHandle FireRateTimerHandle;
     bool bCanFire = true;
+
+    // [추가] 마지막 발사 시간 기록
+    float LastFireTime = 0.0f;
+
+    // [추가] 연속 발사 타이밍 (이 시간 안에 다시 쏘면 연사로 간주)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Stats")
+    float SpreadResetDuration = 0.2f; // FireRate보다 약간 길게 설정 (예: 0.1f)
 
     virtual void BeginPlay() override;
     void ResetFire();
