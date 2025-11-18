@@ -48,64 +48,74 @@ class ALostSectorCharacter : public ACharacter
 public:
 	ALostSectorCharacter();
 
-	// 1. Stamina ╣╔юлем╦╕ Blueprint©║╪╜╣╣ а╒╠ы ╟║╢иго╟т ╪╠╬П
+	// 1. Stamina О©╫О©╫О©╫О©╫О©╫м╦О©╫ BlueprintО©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫о╟О©╫ О©╫О©╫О©╫О©╫
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	FCharacterData CharacterStats;
 
-	// 2. Stamina╦╕ ╟╗╪р╫це╟╢б гт╪Ж╦╕ ╪╠╬Пго╟М BlueprintCallable╥н ЁКцБ
+	// 2. StaminaО©╫О©╫ О©╫О©╫О©╫р╫О©╫е╟О©╫О©╫ О©╫т╪О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫о╟О©╫ BlueprintCallableО©╫О©╫ О©╫О©╫О©╫О©╫
 	UFUNCTION(BlueprintCallable, Category = "Stats|Movement")
 	bool ConsumeStamina(float StaminaCost);
 public:
-	// Blueprint©║╪╜ ╢ч╦╝╠Б ╩Себ╦╕ ╪Ёа╓гр ╪Ж юж╣╣╥о ЁКцБ
+	// BlueprintО©╫О©╫О©╫О©╫ О©╫ч╦О©╫О©╫О©╫ О©╫О©╫О©╫б╦О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫ О©╫ж╣О©╫О©╫О©╫ О©╫О©╫О©╫О©╫
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stamina")
 	bool bIsSprinting = false;
 
-	// Blueprint©║╪╜ хёцБгр гт╪Ж (Left Shift Pressed/Released©║╪╜ хёцБ)
+	// BlueprintО©╫О©╫О©╫О©╫ хёО©╫О©╫О©╫О©╫ О©╫т╪О©╫ (Left Shift Pressed/ReleasedО©╫О©╫О©╫О©╫ хёО©╫О©╫)
 	UFUNCTION(BlueprintCallable, Category = "Stamina")
 	void SetIsSprinting(bool bNewState);
 	
 private:
 	FTimerHandle StaminaTimerHandle;
 	UFUNCTION()
-	void StaminaRegenDrainTick(); // 0.1цй╦╤╢ы хёцБ╣и гт╪Ж
+	void StaminaRegenDrainTick(); // 0.1О©╫й╦О©╫О©╫О©╫ хёО©╫О©╫О©╫ О©╫т╪О©╫
 
-	// ╦╤аЖ╦╥ ╢ч╦╝╠Б а╬╥А ╫ц╟ёю╩ ╠Б╥огр ╨╞╪Ж цъ╟║
+	// О©╫О©╫О©╫О©╫О©╫О©╫ О©╫ч╦О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ц╟О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ъ╟О©╫
 	float LastSprintEndTime;
 
-	// ╫╨ев╧лЁ╙╟║ 0©║ ╣╣╢чгъю╩ ╤╖юг ╫ц╟ёю╩ ╠Б╥огр ╨╞╪Ж цъ╟║
+	// О©╫О©╫О©╫в╧лЁО©╫О©╫О©╫ 0О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ц╟О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ъ╟О©╫
 	float LastStaminaZeroTime;
 
-	// юГ╩Щ аЖ©╛ ╫ц╟ё (╩С╪Ж)
-	const float StaminaRegenDelayDuration = 2.0f; // 1.0цй аЖ©╛ (©Ьго╢б ╟╙ю╦╥н ╪Ёа╓)
+	// О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ц╟О©╫ (О©╫О©╫О©╫)
+	const float StaminaRegenDelayDuration = 2.0f; // 1.0О©╫О©╫ О©╫О©╫О©╫О©╫ (О©╫О©╫О©╫о╢О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫)
 
-	// ╧Х╟Мгд/ц╪╥б ╥наВ цъ╟║ ╫цюш
-	FTimerHandle HungerTimerHandle; // ╧Х╟Мгд ф╫ю╩ ю╖гя е╦юл╦с гз╣И
+	// О©╫О©╫О©╫О©╫О©╫/ц╪О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ъ╟О©╫ О©╫О©╫О©╫О©╫
+	FTimerHandle HungerTimerHandle; // О©╫О©╫О©╫О©╫О©╫ ф╫О©╫О©╫ О©╫О©╫О©╫О©╫ е╦О©╫л╦О©╫ О©╫з╣О©╫
 	UFUNCTION()
-	void HungerDrainTick(); // аж╠БюШю╦╥н ╧Х╟Мгд©м ц╪╥б╦╕ ц╪е╘го╟М ╪р╦Пгр гт╪Ж
+	void HungerDrainTick(); // О©╫ж╠О©╫О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫д©О©╫ ц╪О©╫б╦О©╫ ц╪е╘О©╫о╟О©╫ О©╫р╦О©╫О©╫О©╫ О©╫т╪О©╫
+
+	// Л┌╛К╖² Л┐│М┐° М■▄К·≤Й╥╦
+	bool bIsDead = false;
 
 
-	// ╧Х╟Мгд ╩С╪Ж а╓юг
-	// ╧Х╟Мгд ╪р╦П ╪с╣╣: 10цй©║ 5╬© ╟╗╪р (0.1ф╫╢Г 0.05)
+
+	// О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫ О©╫О©╫О©╫О©╫
+	// О©╫О©╫О©╫О©╫О©╫ О©╫р╦О©╫ О©╫с╣О©╫: 10О©╫й©О©╫ 5О©╫О©╫ О©╫О©╫О©╫О©╫ (0.1ф╫О©╫О©╫ 0.05)
 	const float HungerDrainPerTick = 0.05f;
-	// ╧Х╟Мгд 0юо ╤╖ ц╪╥б ╟╗╪р ╪с╣╣: 1цй╢Г 10╬© ╟╗╪р (0.1ф╫╢Г 1)
+	// О©╫О©╫О©╫О©╫О©╫ 0О©╫О©╫ О©╫О©╫ ц╪О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫с╣О©╫: 1О©╫й╢О©╫ 10О©╫О©╫ О©╫О©╫О©╫О©╫ (0.1ф╫О©╫О©╫ 1)
 	const int32 HealthDrainPerTick = 1;
-	// ╧Х╟Мгд/ц╪╥б ╥наВ цъ╟║ Ё║ 
+	// О©╫О©╫О©╫О©╫О©╫/ц╪О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫ъ╟О©╫ О©╫О©╫ 
 public:
-	// гЖюГ юЕбЬ╣х ╧╚╠Б ╬вем╦╕ ╨╦╟Эгр фВюнем
+	// О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫ О©╫О©╫О©╫м╦О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<class AWeapon> CurrentWeapon;
 
-	// ╨М╥Гга╦╟ф╝©║╪╜ ╬Н╤╡ ╧╚╠Б╦╕ юЕбЬграЖ ╪Ёа╓гр ╪Ж юж╣╣╥о UPROPERTY ЁКцБ
+	// О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫ф╝О©╫О©╫О©╫О©╫ О©╫Н╤╡ О©╫О©╫О©╫Б╦╕ О©╫О©╫О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ О©╫О©╫ О©╫ж╣О©╫О©╫О©╫ UPROPERTY О©╫О©╫О©╫О©╫
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<class AWeapon> DefaultWeaponClass;
 
-	// ╧╚╠Б╦╕ ╫╨фЫго╟М дЁ╦╞ем©║╟т ╨нбЬго╢б гт╪Ж
+	// О©╫О©╫О©╫Б╦╕ О©╫О©╫О©╫О©╫О©╫о╟О©╫ дЁО©╫О©╫О©╫м©О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫о╢О©╫ О©╫т╪О©╫
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void EquipWeapon();
 
-	// гЖюГ ╧╚╠Бюг Fire() гт╪Ж╦╕ хёцБ (Input ©╛╟А©К)
+	// О©╫О©╫О©╫О©╫ О©╫О©╫О©╫О©╫О©╫О©╫ Fire() О©╫т╪О©╫О©╫О©╫ хёО©╫О©╫ (Input О©╫О©╫О©╫О©╫О©╫)
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StartFire();
+
+public:
+
+	// М■▄К═┬Л²╢Л√╢ Л┌╛К╖² Л╡≤К╕╛
+	UFUNCTION(BlueprintCallable, Category = "Death")
+	void Die();
 
 protected:
 	/** Called for movement input */
