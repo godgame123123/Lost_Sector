@@ -125,4 +125,7 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+public:
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
 };
