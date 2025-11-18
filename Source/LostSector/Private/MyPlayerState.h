@@ -41,6 +41,10 @@ public:
     UFUNCTION()
     void SavePlayerDataToServer();
     
+    // 서버에서 인벤토리 초기화 (죽었을 때 사용)
+    UFUNCTION(Server, Reliable, WithValidation)
+    void Server_ClearInventoryOnDeath();
+    
     // 클라이언트 → 서버: 아이템 추가 요청
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_AddItemToStash(const FItemStack& ItemStack);
@@ -49,8 +53,7 @@ public:
     UFUNCTION(Server, Reliable, WithValidation)
     void Server_RemoveItemFromStash(int32 Index);
     
-    UFUNCTION(BlueprintCallable)
-    void UpgradeStat(EStatTypes Stat, int32 Amount);
+    UFUNCTI
     
 protected:
     // 리플리케이션 콜백

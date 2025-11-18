@@ -2,6 +2,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Misc/FileHelper.h"
 #include "JsonObjectConverter.h"
+#include "HAL/PlatformFilemanager.h"
+#include "Misc/Paths.h"
 
 
 UServerDataManager* UServerDataManager::Instance = nullptr;  // ✅ 줄바꿈 오류 수정
@@ -56,5 +58,21 @@ bool UServerDataManager::SavePlayerData(const FString& PlayerID, const FPlayerDa
     FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
     
     FString FilePath = GetPlayerDataPath(PlayerID);
-    return FFileHelper::SaveStringToFile(JsonString, *FilePath);
+    FString Directory = FPaths::GetPath(FilePath);
+    
+    // 디렉토리가 없으면 생성
+    IPlatformFile& PlatformFile = FPlatformFileManager::Get().GetPlatformFile();
+    if (!PlatformFile.DirectoryExists(*Directory))
+    {
+        PlatformFile.CreateDirectoryTree(*Directory);
+    }
+    
+    if (FFileHelper::SaveStringToFile(JsonString, *FilePath))
+    {
+        UE_LOG(LogTemp, Log, TEXT("✅ Player data saved: %s"), *PlayerID);
+        return true;
+    }
+    
+    UE_LOG(LogTemp, Error, TEXT("❌ Failed to save player data: %s"), *PlayerID);
+    return false;
 }

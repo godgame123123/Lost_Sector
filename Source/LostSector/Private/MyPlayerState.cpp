@@ -144,3 +144,22 @@ void AMyPlayerState::UpgradeStat(EStatTypes Stat, int32 Amount)
 {
     // 기존 코드 유지
 }
+
+void AMyPlayerState::Server_ClearInventoryOnDeath_Implementation()
+{
+    if (!HasAuthority()) return;
+    
+    // 인벤토리 아이템 모두 제거
+    int32 RemovedCount = InventoryItems.Num();
+    InventoryItems.Empty();
+    
+    UE_LOG(LogTemp, Warning, TEXT("💀 Player died! Cleared %d inventory items."), RemovedCount);
+    
+    // 데이터 저장
+    SavePlayerDataToServer();
+}
+
+bool AMyPlayerState::Server_ClearInventoryOnDeath_Validate()
+{
+    return true; // 항상 허용 (서버에서만 호출)
+}

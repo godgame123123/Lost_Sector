@@ -1,11 +1,13 @@
 #include "LobbyGameMode.h"
 
 #include "ServerDataManager.h"
+#include "MyPlayerState.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "MapTravelManager.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 
 void ALobbyGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
@@ -31,12 +33,8 @@ ALobbyGameMode::ALobbyGameMode()
         DefaultPawnClass = PawnClassFinder.Class;
     }
     
-    // Player State Class 설정
-    static ConstructorHelpers::FClassFinder<APlayerState> PlayerStateClassFinder(TEXT("/Script/Engine.PlayerState"));
-    if (PlayerStateClassFinder.Succeeded())
-    {
-        PlayerStateClass = PlayerStateClassFinder.Class;
-    }
+    // Player State Class 설정 - MyPlayerState 사용
+    PlayerStateClass = AMyPlayerState::StaticClass();
 }
 
 void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
@@ -45,17 +43,15 @@ void ALobbyGameMode::PostLogin(APlayerController* NewPlayer)
 
     if (NewPlayer)
     {
-        // 플레이어 데이터 로드
-        FString PlayerID = NewPlayer->GetPlayerState<APlayerState>()->GetUniqueId().ToString();
-        
-        if (UServerDataManager* DataManager = UServerDataManager::GetInstance(GetWorld()))
+        // MyPlayerState는 BeginPlay에서 자동으로 데이터를 로드하므로
+        // 여기서는 로그만 남기고 인원 체크를 진행합니다
+        if (AMyPlayerState* MyPS = NewPlayer->GetPlayerState<AMyPlayerState>())
         {
-            FPlayerData PlayerData;
-            if (DataManager->LoadPlayerData(PlayerID, PlayerData))
-            {
-                UE_LOG(LogTemp, Log, TEXT("Player %s loaded in lobby. Money: %d, Level: %d"), 
-                    *PlayerID, PlayerData.Money, PlayerData.Level);
-            }
+            FString PlayerID = MyPS->GetUniqueId().IsValid() 
+                ? MyPS->GetUniqueId()->ToString() 
+                : FString::Printf(TEXT("Local_%d"), MyPS->GetPlayerId());
+            
+            UE_LOG(LogTemp, Log, TEXT("Player %s joined lobby. MyPlayerState will load data automatically."), *PlayerID);
         }
 
         // 서버에서만 인원 체크 및 게임 시작
@@ -76,10 +72,17 @@ void ALobbyGameMode::Logout(AController* Exiting)
     // 로비 나갈 때 데이터 저장
     if (APlayerController* PC = Cast<APlayerController>(Exiting))
     {
-        FString PlayerID = PC->GetPlayerState<APlayerState>()->GetUniqueId().ToString();
-        
-        // 여기서 현재 플레이어 데이터를 저장
-        // (실제 데이터는 PlayerController나 PlayerState에서 가져와야 함)
+        if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
+        {
+            // MyPlayerState의 저장 함수 호출
+            MyPS->SavePlayerDataToServer();
+            
+            FString PlayerID = MyPS->GetUniqueId().IsValid() 
+                ? MyPS->GetUniqueId()->ToString() 
+                : FString::Printf(TEXT("Local_%d"), MyPS->GetPlayerId());
+            
+            UE_LOG(LogTemp, Log, TEXT("Player %s left lobby. Data saved."), *PlayerID);
+        }
     }
 
     Super::Logout(Exiting);
@@ -98,7 +101,10 @@ void ALobbyGameMode::TransitionToFieldMap(APlayerController* PlayerController, c
     if (!PlayerController) return;
 
     // 데이터 저장 후 필드맵으로 이동
-    FString PlayerID = PlayerController->GetPlayerState<APlayerState>()->GetUniqueId().ToString();
+    if (AMyPlayerState* MyPS = PlayerController->GetPlayerState<AMyPlayerState>())
+    {
+        MyPS->SavePlayerDataToServer();
+    }
     
     // 클라이언트를 필드맵으로 이동
     PlayerController->ClientTravel(MapName, TRAVEL_Absolute);
@@ -168,6 +174,22 @@ void ALobbyGameMode::TravelToGameMap()
     int32 CurrentPlayers = GetNumPlayers();
     
     UE_LOG(LogTemp, Warning, TEXT("Starting game with %d players!"), CurrentPlayers);
+    
+    // 모든 플레이어 데이터 저장 (게임 시작 전)
+    if (HasAuthority())
+    {
+        for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+        {
+            if (APlayerController* PC = It->Get())
+            {
+                if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
+                {
+                    MyPS->SavePlayerDataToServer();
+                }
+            }
+        }
+        UE_LOG(LogTemp, Log, TEXT("All player data saved before game start."));
+    }
     
     // 모든 플레이어에게 게임 시작 알림 (선택사항)
     if (UEngine* Engine = GetGameInstance()->GetEngine())

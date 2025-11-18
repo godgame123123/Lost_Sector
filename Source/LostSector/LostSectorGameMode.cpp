@@ -111,6 +111,14 @@ void ALostSectorGameMode::Logout(AController* Exiting)
 				PlayerID = FString::Printf(TEXT("Local_%d"), PC->PlayerState->GetPlayerId());
 			}
 
+			// MyPlayerState 데이터 저장 (ServerDataManager 사용)
+			if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
+			{
+				MyPS->SavePlayerDataToServer();
+				UE_LOG(LogTemp, Log, TEXT("💾 MyPlayerState data saved on logout: %s"), *PlayerID);
+			}
+
+			// InventoryComponent 데이터 저장 (InventorySaveManager 사용)
 			if (UInventoryComponent* InventoryComp = PC->GetPawn()->FindComponentByClass<UInventoryComponent>())
 			{
 				// TODO: 창고 데이터도 함께 저장
@@ -119,7 +127,7 @@ void ALostSectorGameMode::Logout(AController* Exiting)
 				if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, 
 					InventoryComp->Slots, EmptyStorage))
 				{
-					UE_LOG(LogTemp, Log, TEXT("💾 Player inventory saved on logout: %s"), *PlayerID);
+					UE_LOG(LogTemp, Log, TEXT("💾 InventoryComponent data saved on logout: %s"), *PlayerID);
 				}
 			}
 		}
