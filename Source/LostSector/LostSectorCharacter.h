@@ -48,7 +48,7 @@ class ALostSectorCharacter : public ACharacter
 public:
 	ALostSectorCharacter();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats", Replicated)
 	FCharacterData CharacterStats;
 
 	UFUNCTION(BlueprintCallable, Category = "Stats|Movement")
@@ -82,6 +82,8 @@ private:
 
 	const int32 HealthDrainPerTick = 1;
 
+	FTimerHandle FireTimerHandle;
+
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<class AWeapon> CurrentWeapon;
@@ -95,6 +97,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StartFire();
 
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void StopFire();
 public:
 
 	// 플레이어 사망 처리

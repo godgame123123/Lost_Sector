@@ -20,8 +20,9 @@ public class LostSector : ModuleRules
 			"UMG",
 			"Json", 
 			"JsonUtilities",
-			"AIModule"
-		});
+			"AIModule",
+            "GameplayTasks"
+        });
 		
 		// ✅ Steam은 동적 로드만 사용 (PublicDependency에서 제거)
 		DynamicallyLoadedModuleNames.Add("OnlineSubsystemSteam");
