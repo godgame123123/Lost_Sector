@@ -84,7 +84,6 @@ void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		UE_LOG(LogTemplateCharacter, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
 	}
 	
-
 }
 
 // To add mapping context
@@ -97,10 +96,8 @@ void ALostSectorCharacter::BeginPlay()
 	//Add Input Mapping Context
 	if (APlayerController* PlayerController = Cast<APlayerController>(Controller))
 	{
-		// ���콺 Ŀ�� ǥ��
 		PlayerController->bShowMouseCursor = true;
 
-		// ���콺 Ŭ���� ����� UI�� ��� ������ ��ġ���� ����
 		PlayerController->SetInputMode(FInputModeGameAndUI());
 
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
@@ -113,54 +110,80 @@ void ALostSectorCharacter::BeginPlay()
 		StaminaTimerHandle,
 		this,
 		&ALostSectorCharacter::StaminaRegenDrainTick,
-		0.1f, // ƽ ����
-		true  // �ݺ�
+		0.1f, 
+		true  
 	);
 
 	GetWorldTimerManager().SetTimer(
 		HungerTimerHandle,
 		this,
 		&ALostSectorCharacter::HungerDrainTick,
-		0.1f, // ƽ ����
+		0.1f,
 		true
 	);
 	EquipWeapon();
+}
+float ALostSectorCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	// 1. ACharacter의 기본 TakeDamage 함수를 호출하여 기본 처리를 수행하고 실제 적용될 데미지량을 얻습니다.
+	const float DamageApplied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+
+	// 2. 이미 죽었거나 적용된 데미지가 없으면 리턴
+	if (bIsDead || DamageApplied <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	// 3. 체력 감소
+	CharacterStats.Hp -= DamageApplied;
+
+	// 4. 체력을 0 이상으로 클램프
+	CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
+
+	UE_LOG(LogTemp, Warning, TEXT("Character %s took %f damage. Current HP: %f"), *GetName(), DamageApplied, CharacterStats.Hp);
+
+	// 5. 사망 체크
+	if (CharacterStats.Hp <= 0.0f)
+	{
+		Die(); // 이미 정의된 Die() 함수 호출
+	}
+
+	return DamageApplied;
 }
 void ALostSectorCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// 1. ĳ���� �����Ʈ ������Ʈ�� �����ɴϴ�.
 	UCharacterMovementComponent* MovementComp = GetCharacterMovement();
 
 	if (bIsSprinting)
 	{
-		// [�� �� ����]
-		// ������ �������� ȸ���ϵ��� Unreal Engine�� �⺻ ���(bOrientRotationToMovement)�� Ȱ��ȭ�մϴ�.
 		if (MovementComp && !MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = true;
 		}
 
-		// �޸��� �߿��� ���콺 ȸ�� ������ �ǳʶݴϴ�.
 		return;
 	}
-	else // �Ȱų� �������� �� (bIsSprinting == false)
+	else 
 	{
-		// [�Ȱų� �������� �� ����]
-		// ���콺 Ŀ�� �������� ���� ȸ���ϱ� ���� Unreal Engine�� �ڵ� ȸ�� ����� ��Ȱ��ȭ�մϴ�.
 		if (MovementComp && MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = false;
 		}
-
-		// --- ���콺 Ŀ�� �������� ȸ����Ű�� ���� ���� ���� ���� ---
 
 		APlayerController* PC = Cast<APlayerController>(GetController());
 		if (!PC)
 		{
 			return;
 		}
+
+		FInputModeGameAndUI InputMode;
+		// 마우스 커서를 가두지 않도록 설정 (선택적)
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PC->SetInputMode(InputMode);
+
+		PC->bShowMouseCursor = true;
 
 		FVector WorldLocation, WorldDirection;
 		PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
@@ -182,7 +205,7 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 
 		FVector TargetLocation = bHit ? HitResult.Location : EndTrace;
 
-		// ���� ��ġ���� Ÿ�� ��ġ�� �ٶ󺸴� ������ ����մϴ�. (Z�� ����)
+		
 		FVector CurrentLocation = GetActorLocation();
 		FVector Direction = TargetLocation - CurrentLocation;
 		Direction.Z = 0.0f;
@@ -193,7 +216,6 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 		FRotator CurrentRotation = GetActorRotation();
 		float RotationSpeed = 10.0f;
 
-		// �ε巴�� �����Ͽ� ȸ���� �����մϴ�.
 		FRotator NewRotation = FMath::RInterpTo(
 			CurrentRotation,
 			TargetRotation,
@@ -201,80 +223,67 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 			RotationSpeed
 		);
 
-		// ĳ������ ȸ���� Yaw ������ ������Ʈ�մϴ�.
 		SetActorRotation(FRotator(0.0f, NewRotation.Yaw, 0.0f));
 
-		// --- ���콺 Ŀ�� �������� ȸ����Ű�� ���� ���� ���� �� ---
 	}
 }
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
-	// 1. Stamina�� ��뺸�� ũ�ų� ������ Ȯ��
 	if (CharacterStats.Stamina >= StaminaCost)
 	{
-		// 2. Stamina ����
 		CharacterStats.Stamina -= StaminaCost;
-		// (����) ����� �α� ���
+
 		UE_LOG(LogTemp, Warning, TEXT("Stamina Consumed: %f	. Current Stamina: %f"), StaminaCost, CharacterStats.Stamina);
-		// 3. Stamina �Ҹ� ����
+
 		return true;
 	}
-	// Stamina�� �����Ͽ� �Ҹ� ����
 	return false;
 }
 void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 {
-	// �޸��� ���°� ������ �� (True -> False)
 	if (bIsSprinting == true && bNewState == false)
 	{
-		// ���� ���� �ð��� ����մϴ�.
 		LastSprintEndTime = GetWorld()->GetTimeSeconds();
 	}
 	bIsSprinting = bNewState;
 }
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
-	// MaxStamina ���� FCharacterData�� �߰����� �ʾҴٸ�, �ӽ� Max �� ��� (����)
 	const float MaxStamina = 100.0f;
 	float StaminaChange = 0.0f;
-	// ���� ���� �ð� ��������
+
 	const float CurrentTime = GetWorld()->GetTimeSeconds();
-	// Stamina ��� ���� �ð� (��)
+
 	const float LastDrainTime = FMath::Max(LastSprintEndTime, LastStaminaZeroTime);
-	// ��� ���� �ð� ���
+
 	const float RegenAllowedTime = LastDrainTime + StaminaRegenDelayDuration;
-	// �޸��� ���� üũ �� Stamina ���淮 ����
+
 	if (bIsSprinting)
 	{
-		// �޸� ��: Stamina �Ҹ� (��: ƽ�� -1)
 		StaminaChange = -1.0f;
 	}
-	else // ��� ���� (��� �õ�)
+	else 
 	{
-		// Stamina�� Max���� ���� ���� ��� �õ�
+
 		if (CharacterStats.Stamina < MaxStamina)
 		{
-			// ���� �ð��� �������� Ȯ��
+
 			if (CurrentTime < RegenAllowedTime)
 			{
-				StaminaChange = 0.0f; // ���� �ð� �̳�: ��� ����
+				StaminaChange = 0.0f;
 			}
 			else
 			{
-				StaminaChange = 1.0f; // ���� �ð� ���: Stamina ���
+				StaminaChange = 1.0f;
 			}
 		}
 	}
-	// FCharacterData::Stamina �� ������Ʈ
 	CharacterStats.Stamina += StaminaChange;
 
-	// �ּ�/�ִ� ������ Clamp (0 ����, Max �̻����� �Ѿ�� �ʰ� ����)
 	CharacterStats.Stamina = FMath::Clamp(CharacterStats.Stamina, 0.0f, MaxStamina);
 
-	// Stamina�� 0�� �������� ���� ����
 	if (CharacterStats.Stamina <= 0.0f)
 	{
-		// ���� ��ŷ ���� (Stamina�� 0�� �Ǹ� �޸��� ���� ����)
 		if (bIsSprinting)
 		{
 			if (GetCharacterMovement())
@@ -283,46 +292,38 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 			}
 			bIsSprinting = false;
 		}
-		// Stamina�� 0�� ���¸� ������ �� LastStaminaZeroTime�� ���� �ð����� ����
-		// (LastStaminaZeroTime�� ��� �����Ͽ� 0�� ���¿����� ����� ������ ���ܵǰ� �մϴ�.)
 		if (LastStaminaZeroTime == 0.0f)
 		{
 			LastStaminaZeroTime = CurrentTime;
 		}
 	}
-	// Stamina�� 1 �̻����� �ö���� (��� ���� ���°� �Ǹ�) LastStaminaZeroTime �ʱ�ȭ
-	// (�̷��� �ؾ� ���� �ð��� ���� �� ����� ���۵ʰ� ���ÿ� LastStaminaZeroTime�� ���ŵ��� �ʽ��ϴ�.)
 	else
 	{
-		LastStaminaZeroTime = 0.0f; // Stamina�� 0�� �ƴ� ���� �ʱ�ȭ
+		LastStaminaZeroTime = 0.0f;
 	}
 }
 
 void ALostSectorCharacter::HungerDrainTick()
 {
-	// 1. Hunger �Ҹ� ����
-	if (CharacterStats.hungry > 0.0f) // 0.0f�� ��
+	if (!IsPlayerControlled())
 	{
-		// ƽ�� �Ҹ� (0.05f)��ŭ ���� ����
+		return;
+	}
+	if (CharacterStats.hungry > 0.0f) 
+	{
 		CharacterStats.hungry -= HungerDrainPerTick;
 
-		// 0.0f �̸����� �������� �ʵ��� Clamp
 		CharacterStats.hungry = FMath::Max(0.0f, CharacterStats.hungry);
 	}
 
-	// 2. Hunger�� 0�� �� HP ���� ����
-	if (CharacterStats.hungry <= 0.0f) // 0.0f�� ��
+	if (CharacterStats.hungry <= 0.0f)
 	{
-		// HP�� 0.0f���� Ŭ ���� HP ����
-		if (CharacterStats.Hp > 0.0f) // 0.0f�� ��
+		if (CharacterStats.Hp > 0.0f)
 		{
-			// HealthDrainPerTick�� int32������ float ���꿡 ���� ����
 			CharacterStats.Hp -= HealthDrainPerTick;
 
-			// HP�� 0.0f �̸����� �������� �ʵ��� Clamp
 			CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
 
-			// (����) �α� ��� �� ���� ������ %f�� ����
 			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
 		}
 	}
@@ -339,19 +340,17 @@ void ALostSectorCharacter::EquipWeapon()
 		return;
 	}
 
-	// 1. ���� ����
 	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = this; // ĳ���͸� Owner�� ����
+	SpawnParams.Owner = this; 
 	SpawnParams.Instigator = GetInstigator();
 
 	CurrentWeapon = GetWorld()->SpawnActor<AWeapon>(DefaultWeaponClass, SpawnParams);
 
 	if (CurrentWeapon)
 	{
-		// 2. ĳ������ ���̷�Ż �޽��� ����
 		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
 		{
-			const FName WeaponSocketName = FName("WeaponSocket"); // <- ���̷�Ż �޽��� ���� �̸����� �����ϼ���!
+			const FName WeaponSocketName = FName("WeaponSocket");
 
 			CurrentWeapon->AttachToComponent(
 				CharacterMesh,
@@ -359,7 +358,6 @@ void ALostSectorCharacter::EquipWeapon()
 				WeaponSocketName
 			);
 
-			// 3. ������ Instigator�� �� ĳ���ͷ� ���� (������ ApplyDamage���� ����)
 			CurrentWeapon->SetInstigator(this);
 		}
 	}
@@ -379,27 +377,23 @@ void ALostSectorCharacter::StartFire()
 		return;
 	}
 
-	// 1. �÷��̾� ��Ʈ�ѷ��� �����ɴϴ�.
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC)
 	{
 		return;
 	}
 
-	// 2. ���콺 Ŀ���� ��ũ�� ��ġ�� ���� ��ǥ���� ����(Ray)���� ��ȯ�մϴ�.
 	FVector WorldLocation, WorldDirection;
 	PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
 
-	// 3. ���콺 �������� ������ ���� Ʈ���̽��Ͽ� Ÿ�� ���� ��ǥ�� ã���ϴ�.
 	FHitResult HitResult;
 	FVector StartTrace = WorldLocation;
-	// Ʈ���̽� ���̴� ����� ��� �����մϴ�.
+
 	FVector EndTrace = WorldLocation + WorldDirection * 50000.0f;
 
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(this);
 
-	// ECollisionChannel::ECC_WorldStatic ä�η� Ʈ���̽��Ͽ� ���鸸 Ž���մϴ�.
 	bool bHit = GetWorld()->LineTraceSingleByChannel(
 		HitResult,
 		StartTrace,
@@ -408,9 +402,8 @@ void ALostSectorCharacter::StartFire()
 		Params
 	);
 
-	FVector TargetLocation = bHit ? HitResult.Location : EndTrace; // ���鿡 ������� ���� ��ġ, �ƴϸ� Ʈ���̽� ����
+	FVector TargetLocation = bHit ? HitResult.Location : EndTrace;
 
-	// 4. �ѱ� ��ġ�� �����ɴϴ�. (AWeapon�� GetMuzzleLocation() �Լ��� �־�� �մϴ�. �Ʒ� ����)
 	USceneComponent* MuzzleComp = CurrentWeapon->GetMuzzleLocation();
 	if (!MuzzleComp)
 	{
@@ -418,10 +411,8 @@ void ALostSectorCharacter::StartFire()
 	}
 	FVector MuzzleLocation = MuzzleComp->GetComponentLocation();
 
-	// 5. �ѱ� ��ġ���� Ÿ�� ������ �ٶ󺸴� ������ ���� �߻� �������� ����մϴ�.
 	FVector FireDirection = (TargetLocation - MuzzleLocation).GetSafeNormal();
 
-	// 6. ���� �������� Fire �Լ� ȣ��
 	CurrentWeapon->Fire(FireDirection);
 }
 
