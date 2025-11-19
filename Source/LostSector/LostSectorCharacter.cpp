@@ -16,6 +16,9 @@
 #include "InventorySaveManager.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
+#include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
+#include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -125,6 +128,17 @@ void ALostSectorCharacter::BeginPlay()
 }
 float ALostSectorCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
+	// 1. 피해를 준 주체(Instigator)가 AI Controller인지 확인
+	bool bInstigatorIsAI = EventInstigator && EventInstigator->IsA<AAIController>();
+
+	// 2. 피해를 받은 대상(현재 캐릭터, this)이 플레이어의 제어를 받지 않고 있는지 확인 (즉, AI/NPC)
+	bool bTargetIsAIControlled = !IsPlayerControlled();
+
+	// 만약 AI가 AI에게 공격했다면 데미지 처리를 무시하고 0을 리턴
+	if (bInstigatorIsAI && bTargetIsAIControlled)
+	{
+		return 0.0f;
+	}
 	// 1. ACharacter의 기본 TakeDamage 함수를 호출하여 기본 처리를 수행하고 실제 적용될 데미지량을 얻습니다.
 	const float DamageApplied = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
@@ -365,55 +379,103 @@ void ALostSectorCharacter::EquipWeapon()
 
 void ALostSectorCharacter::StartFire()
 {
-
-	if (bIsSprinting)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: Cannot fire while sprinting."));
-		return;
-	}
-
-	if (!CurrentWeapon)
+	if (bIsSprinting || !CurrentWeapon)
 	{
 		return;
 	}
 
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC)
+	AController* CurrentController = GetController();
+	FVector FireDirection = GetActorForwardVector();
+
+	// 컨트롤러가 없으면 발사하지 않습니다. (예: 아직 빙의되지 않은 상태)
+	if (!CurrentController)
 	{
 		return;
 	}
-
-	FVector WorldLocation, WorldDirection;
-	PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection);
-
-	FHitResult HitResult;
-	FVector StartTrace = WorldLocation;
-
-	FVector EndTrace = WorldLocation + WorldDirection * 50000.0f;
-
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-
-	bool bHit = GetWorld()->LineTraceSingleByChannel(
-		HitResult,
-		StartTrace,
-		EndTrace,
-		ECollisionChannel::ECC_WorldStatic,
-		Params
-	);
-
-	FVector TargetLocation = bHit ? HitResult.Location : EndTrace;
 
 	USceneComponent* MuzzleComp = CurrentWeapon->GetMuzzleLocation();
-	if (!MuzzleComp)
-	{
-		return;
-	}
+	if (!MuzzleComp) return;
 	FVector MuzzleLocation = MuzzleComp->GetComponentLocation();
 
-	FVector FireDirection = (TargetLocation - MuzzleLocation).GetSafeNormal();
+	FVector TargetLocation = FVector::ZeroVector;
 
+	// 1. 플레이어 컨트롤러 조준 로직
+	if (CurrentController->IsPlayerController())
+	{
+		APlayerController* PC = CastChecked<APlayerController>(CurrentController); // 캐스팅 체크는 안정성을 높입니다.
+
+		// 1. 마우스 위치를 월드 좌표로 변환합니다.
+		FVector WorldLocation, WorldDirection;
+		if (!PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+		{
+			return; // 디프로젝트 실패 시 종료
+		}
+
+		// 2. 라인 트레이스 실행
+		FHitResult HitResult;
+		FVector StartTrace = WorldLocation;
+		FVector EndTrace = WorldLocation + WorldDirection * CurrentWeapon->MaxRange;
+
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+
+		bool bHit = GetWorld()->LineTraceSingleByChannel(
+			HitResult,
+			StartTrace,
+			EndTrace,
+			ECollisionChannel::ECC_Visibility,
+			Params
+		);
+
+		// 5. TargetLocation 결정
+		TargetLocation = bHit ? HitResult.Location : EndTrace;
+	}
+	// 2. AI 컨트롤러 조준 로직
+	else if (CurrentController->IsA<AAIController>())
+	{
+		AAIController* AIController = Cast<AAIController>(CurrentController);
+		UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent();
+
+		// [핵심] 블랙보드에서 Player Vector Location 키의 위치를 가져와 타겟으로 설정합니다.
+		TargetLocation = BlackboardComp->GetValueAsVector(TEXT("PlayerVectorLocation"));
+	}
+	else
+	{
+		return; // 다른 종류의 컨트롤러는 발사하지 않음
+	}
+
+	// TargetLocation이 유효하면 발사 방향 계산 (AI/플레이어 공통)
+	if (TargetLocation != FVector::ZeroVector)
+	{
+		FireDirection = (TargetLocation - MuzzleLocation).GetSafeNormal();
+	}
+	else // 유효한 타겟 위치가 없으면 정면으로 발사
+	{
+		FireDirection = GetActorForwardVector();
+	}
+
+	// 3. 발사 시도
 	CurrentWeapon->Fire(FireDirection);
+
+	// 4. 연사 타이머 설정 (타이머가 돌고 있지 않을 때만 설정)
+	if (!GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	{
+		GetWorldTimerManager().SetTimer(
+			FireTimerHandle,
+			this,
+			&ALostSectorCharacter::StartFire,
+			CurrentWeapon->FireRate,
+			true
+		);
+	}
+}
+
+void ALostSectorCharacter::StopFire()
+{
+	if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+	}
 }
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)
@@ -508,4 +570,12 @@ void ALostSectorCharacter::Die()
 			}
 		}
 	}
+}
+
+void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	// [DOREPLIFETIME 표준 사용] CharacterStats 변수 전체를 복제 대상으로 등록
+	DOREPLIFETIME(ALostSectorCharacter, CharacterStats);
 }

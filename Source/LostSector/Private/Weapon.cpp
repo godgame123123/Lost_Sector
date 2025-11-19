@@ -3,7 +3,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Kismet/GameplayStatics.h"
-
+#include "AIController.h" 
+#include "EngineUtils.h"
 AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -54,6 +55,36 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
     // Trace Channel을 Visibility 또는 Custom Trace Channel로 설정
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this); // 무기 액터는 트레이스에서 제외
+
+    AController* InstigatorController = GetInstigatorController();
+    AActor* InstigatorPawn = GetInstigator();
+
+    if (InstigatorPawn)
+    {
+        Params.AddIgnoredActor(InstigatorPawn); // 발사자(Instigator Pawn)도 무시 목록에 추가
+
+        // 발사자가 AI Controller의 제어를 받고 있다면 (즉, AI가 공격 중이라면)
+        if (InstigatorController && InstigatorController->IsA<AAIController>())
+        {
+            UWorld* World = GetWorld();
+            if (World)
+            {
+                // 월드 내의 모든 Pawn (캐릭터)을 순회합니다.
+                for (TActorIterator<APawn> It(World); It; ++It)
+                {
+                    APawn* Pawn = *It;
+
+                    // 1. Pawn이 유효하고 2. 플레이어가 제어하지 않는 경우 (즉, 다른 AI/NPC인 경우)
+                    // (추가적으로 팀 체크 로직을 넣을 수 있지만, 여기서는 간단히 AI/NPC로 구분)
+                    if (Pawn && !Pawn->IsPlayerControlled())
+                    {
+                        // 해당 AI/NPC 캐릭터를 라인 트레이스 무시 목록에 추가합니다.
+                        Params.AddIgnoredActor(Pawn);
+                    }
+                }
+            }
+        }
+    }
 
     bool bHit = GetWorld()->LineTraceSingleByChannel(
         HitResult,
