@@ -48,66 +48,50 @@ class ALostSectorCharacter : public ACharacter
 public:
 	ALostSectorCharacter();
 
-	// 1. Stamina �����͸� Blueprint������ ���� �����ϰ� ����
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
 	FCharacterData CharacterStats;
 
-	// 2. Stamina�� ���ҽ�Ű�� �Լ��� �����ϰ� BlueprintCallable�� ����
 	UFUNCTION(BlueprintCallable, Category = "Stats|Movement")
 	bool ConsumeStamina(float StaminaCost);
 public:
-	// Blueprint���� �޸��� ���¸� ������ �� �ֵ��� ����
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stamina")
 	bool bIsSprinting = false;
 
-	// Blueprint���� ȣ���� �Լ� (Left Shift Pressed/Released���� ȣ��)
 	UFUNCTION(BlueprintCallable, Category = "Stamina")
 	void SetIsSprinting(bool bNewState);
 	
 private:
 	FTimerHandle StaminaTimerHandle;
 	UFUNCTION()
-	void StaminaRegenDrainTick(); // 0.1�ʸ��� ȣ��� �Լ�
+	void StaminaRegenDrainTick();
 
-	// ������ �޸��� ���� �ð��� ����� ���� �߰�
 	float LastSprintEndTime;
 
-	// ���׹̳��� 0�� �������� ���� �ð��� ����� ���� �߰�
 	float LastStaminaZeroTime;
 
-	// ��� ���� �ð� (���)
-	const float StaminaRegenDelayDuration = 2.0f; // 1.0�� ���� (���ϴ� ������ ����)
+	const float StaminaRegenDelayDuration = 2.0f;
 
-	// �����/ü�� ���� �߰� ����
-	FTimerHandle HungerTimerHandle; // ����� ƽ�� ���� Ÿ�̸� �ڵ�
+	FTimerHandle HungerTimerHandle;
 	UFUNCTION()
-	void HungerDrainTick(); // �ֱ������� ����Ŀ� ü�¸� üũ�ϰ� �Ҹ��� �Լ�
+	void HungerDrainTick();
 
 	// 사망 상태 플래그
 	bool bIsDead = false;
 
-
-
-	// ����� ��� ����
-	// ����� �Ҹ� �ӵ�: 10�ʿ� 5�� ���� (0.1ƽ�� 0.05)
 	const float HungerDrainPerTick = 0.05f;
-	// ����� 0�� �� ü�� ���� �ӵ�: 1�ʴ� 10�� ���� (0.1ƽ�� 1)
+
 	const int32 HealthDrainPerTick = 1;
-	// �����/ü�� ���� �߰� �� 
+
 public:
-	// ���� ������ ���� ���͸� ������ ������
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<class AWeapon> CurrentWeapon;
 
-	// ��������Ʈ���� � ���⸦ �������� ������ �� �ֵ��� UPROPERTY ����
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<class AWeapon> DefaultWeaponClass;
 
-	// ���⸦ �����ϰ� ĳ���Ϳ��� �����ϴ� �Լ�
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void EquipWeapon();
 
-	// ���� ������ Fire() �Լ��� ȣ�� (Input �����)
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StartFire();
 
@@ -135,6 +119,13 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+	virtual float TakeDamage(
+		float DamageAmount,
+		struct FDamageEvent const& DamageEvent,
+		AController* EventInstigator,
+		AActor* DamageCauser
+	) override;
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;

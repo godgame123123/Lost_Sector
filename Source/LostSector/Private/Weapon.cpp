@@ -109,19 +109,48 @@ void AWeapon::Fire(FVector Direction)
         return;
     }
 
+    // 1. [핵심] 첫 발 여부 확인
+    const float CurrentTime = GetWorld()->GetTimeSeconds();
+    // 마지막 발사 후 SpreadResetDuration보다 긴 시간이 지났다면 첫 발로 간주 (분산 미적용)
+    const bool bIsFirstShot = (CurrentTime - LastFireTime > SpreadResetDuration);
+
+    // 2. 마지막 발사 시간 업데이트
+    LastFireTime = CurrentTime;
+
     // [추가] 발사 시작 시 로그 출력
-    UE_LOG(LogTemp, Log, TEXT("Fire Start! Ammo Left: %d"), CurrentAmmo - 1);
+    UE_LOG(LogTemp, Log, TEXT("Fire Start! Ammo Left: %d, First Shot: %s"), CurrentAmmo - 1, bIsFirstShot ? TEXT("True") : TEXT("False"));
 
     // 발사 로직 실행
     bCanFire = false;
     CurrentAmmo--;
 
     // ----------------------------------------------------
-    // [핵심] 쿼터뷰 발사 방향 결정 로직
+    // [핵심] 총알 분산 (Aim Spread) 로직 적용
     // ----------------------------------------------------
     FVector StartLocation = MuzzleLocation->GetComponentLocation();
 
-    PerformLineTrace(StartLocation, Direction);
+    // 최종 발사 방향을 Direction으로 초기화합니다.
+    FVector FinalFireDirection = Direction;
+
+    // 첫 발이 아니거나 (연사 중이거나), SpreadAngle이 0보다 커야 분산을 적용합니다.
+    if (!bIsFirstShot && SpreadAngle > 0.0f)
+    {
+        // 1. 현재 방향(Direction)을 회전값으로 변환
+        const FRotator CurrentRotator = Direction.Rotation();
+
+        // 2. SpreadAngle 범위 내에서 무작위 각도(Yaw, Pitch) 생성
+        float RandomYaw = FMath::FRandRange(-SpreadAngle, SpreadAngle);
+        float RandomPitch = FMath::FRandRange(-SpreadAngle, SpreadAngle);
+
+        // 3. 현재 회전값에 무작위 분산 각도를 더함
+        const FRotator SpreadRotator = CurrentRotator + FRotator(RandomPitch, RandomYaw, 0.0f);
+
+        // 4. 새로운 회전값으로 변환된 최종 발사 방향을 얻음
+        FinalFireDirection = UKismetMathLibrary::GetForwardVector(SpreadRotator);
+    }
+    // [첫 발인 경우] FinalFireDirection은 Direction 그대로 유지되어 정확하게 발사됩니다.
+
+    PerformLineTrace(StartLocation, FinalFireDirection); // **수정된 방향 전달**
 
     OnFireEvent();
 
