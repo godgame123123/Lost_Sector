@@ -21,7 +21,8 @@ public class LostSector : ModuleRules
 			"Json", 
 			"JsonUtilities",
 			"AIModule",
-            "GameplayTasks"
+            "GameplayTasks",
+            "Niagara"
         });
 		
 		// ✅ Steam은 동적 로드만 사용 (PublicDependency에서 제거)

@@ -65,7 +65,7 @@ void AEnemyAI::OnPossess(APawn * InPawn)
             GetWorld()->GetTimerManager().SetTimer(
                 LoseSightHandle,
                 [this, Actor]()
-                {
+                { 
                     // 일정 시간 후 TargetActor 제거, 마지막 위치 저장
                     if (BlackboardComp)
                     {

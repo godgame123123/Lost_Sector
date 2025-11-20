@@ -5,6 +5,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "AIController.h" 
 #include "EngineUtils.h"
+#include "NiagaraFunctionLibrary.h" // 나이아가라 함수 라이브러리
+#include "NiagaraComponent.h"
+#include "Components/SkeletalMeshComponent.h" // 스켈레탈 메시 컴포넌트 접근을 위해
+#include "ATracer.h"
+
 AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = false;
@@ -94,20 +99,67 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
         Params
     );
 
-    FColor LineColor = bHit ? FColor::Red : FColor::Green;
+    FVector TargetLocation = bHit ? HitResult.Location : End;
+
+    if (TracerActorClass)
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        SpawnParams.Instigator = GetInstigator();
+
+        // 트레이서 액터를 총구 위치(Start)에 생성
+        AATracer* TracerActor = GetWorld()->SpawnActor<AATracer>(
+            TracerActorClass,
+            Start,
+            Direction.Rotation(),
+            SpawnParams
+        );
+
+        if (TracerActor)
+        {
+            // 2. [이동 지시] TargetLocation과 속도를 전달합니다.
+            //     이 함수 호출을 누락하면 AATracer의 TargetLocation 변수는 기본값 (FVector::ZeroVector)으로 남아있게 됩니다.
+
+            const float BulletSpeed = 20000.0f; // 매우 빠른 속도로 설정 (단위: cm/s)
+
+            // AATracer::StartMoving 함수 호출
+            TracerActor->StartMoving(TargetLocation, BulletSpeed);
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to spawn AATracer actor!"));
+        }
+    }
+    
+
+    // 2. 히트 임팩트 이펙트 생성 (맞았을 경우에만)
+    if (bHit && HitImpactFX) // AWeapon.h에 선언된 UNiagaraSystem* HitImpactFX 변수 사용
+    {
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+            GetWorld(),
+            HitImpactFX,
+            HitResult.Location,
+            HitResult.ImpactNormal.Rotation(), // 맞은 면의 법선 방향으로 회전
+            FVector(1.0f),
+            true,
+            true
+        );
+    }
+
+    //FColor LineColor = bHit ? FColor::Red : FColor::Green;
 
     // DrawDebugLine 함수는 Kismet/KismetMathLibrary.h 에 정의되어 있습니다.
     // 현재 코드에는 #include "Kismet/KismetMathLibrary.h" 가 포함되어 있으므로 바로 사용 가능합니다.
-    DrawDebugLine(
-        GetWorld(),
-        Start,
-        bHit ? HitResult.Location : End, // 히트했으면 히트 지점까지, 아니면 최대 사거리까지
-        LineColor,
-        false,      // bPersistentLines (영구적이지 않음)
-        5.0f,       // LifeTime (5초간 표시)
-        0,          // DepthPriority
-        3.0f        // Thickness (선의 두께)
-    );
+    //DrawDebugLine(
+    //    GetWorld(),
+    //    Start,
+    //    bHit ? HitResult.Location : End, // 히트했으면 히트 지점까지, 아니면 최대 사거리까지
+    //    LineColor,
+    //    false,      // bPersistentLines (영구적이지 않음)
+    //    5.0f,       // LifeTime (5초간 표시)
+    //    0,          // DepthPriority
+    //    3.0f        // Thickness (선의 두께)
+    //);
 
     if (bHit)
     {
@@ -160,6 +212,22 @@ void AWeapon::Fire(FVector Direction)
     // ----------------------------------------------------
     FVector StartLocation = MuzzleLocation->GetComponentLocation();
 
+    if (MuzzleLocation) // 총구 위치 컴포넌트가 유효한지 확인
+    {
+        if (MuzzleFlashFX) // AWeapon.h에 선언된 UNiagaraSystem* MuzzleFlashFX 변수 사용
+        {
+            UNiagaraFunctionLibrary::SpawnSystemAttached(
+                MuzzleFlashFX,                  // 생성할 나이아가라 시스템
+                MuzzleLocation,                 // 부착할 컴포넌트
+                NAME_None,                      // 소켓 이름
+                FVector::ZeroVector,            // 상대 위치 오프셋
+                FRotator::ZeroRotator,          // 상대 회전 오프셋
+                EAttachLocation::SnapToTarget,  // 타겟에 스냅
+                true                            // 자동 파괴
+            );
+        }
+    }
+
     // 최종 발사 방향을 Direction으로 초기화합니다.
     FVector FinalFireDirection = Direction;
 
@@ -184,7 +252,7 @@ void AWeapon::Fire(FVector Direction)
     PerformLineTrace(StartLocation, FinalFireDirection); // **수정된 방향 전달**
 
     OnFireEvent();
-
+    
     // 연사 속도 타이머 설정
     GetWorld()->GetTimerManager().SetTimer(
         FireRateTimerHandle,
