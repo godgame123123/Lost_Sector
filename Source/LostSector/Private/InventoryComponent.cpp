@@ -14,7 +14,7 @@ UInventoryComponent::UInventoryComponent()
 void UInventoryComponent::BeginPlay()
 {
     Super::BeginPlay();
-    
+
     if (GetOwnerRole() == ROLE_Authority)
     {
         InitSlots();
@@ -34,6 +34,8 @@ void UInventoryComponent::InitSlots()
     {
         Slots.Add(FItemStack());
     }
+
+    BroadcastUpdated();    // 초기 슬롯 생성 시에도 UI 갱신
 }
 
 float UInventoryComponent::GetTotalWeight() const
@@ -41,7 +43,7 @@ float UInventoryComponent::GetTotalWeight() const
     float Total = 0.f;
     for (const FItemStack& Stack : Slots)
     {
-        if (Stack.Item)  // ← Item으로 수정
+        if (Stack.Item)
         {
             Total += Stack.Item->Weight * Stack.Count;
         }
@@ -62,13 +64,13 @@ bool UInventoryComponent::TryAddStack(const FItemStack& InStack, int32& OutAdded
         return false;
     }
 
-    if (!InStack.Item || InStack.Count <= 0)  // ← Item으로 수정
+    if (!InStack.Item || InStack.Count <= 0)
     {
         OutAdded = 0;
         return false;
     }
 
-    float SingleWeight = InStack.Item->Weight;  // ← Item으로 수정
+    float SingleWeight = InStack.Item->Weight;
     int32 Remaining = InStack.Count;
     OutAdded = 0;
 
@@ -76,9 +78,9 @@ bool UInventoryComponent::TryAddStack(const FItemStack& InStack, int32& OutAdded
     for (int32 i = 0; i < Slots.Num() && Remaining > 0; i++)
     {
         FItemStack& Slot = Slots[i];
-        if (Slot.Item == InStack.Item && Slot.Count < InStack.Item->MaxStack)  // ← Item으로 수정
+        if (Slot.Item == InStack.Item && Slot.Count < InStack.Item->MaxStack)
         {
-            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack - Slot.Count);  // ← Item으로 수정
+            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack - Slot.Count);
             if (CanAddWeight(CanAdd * SingleWeight))
             {
                 Slot.Count += CanAdd;
@@ -92,12 +94,12 @@ bool UInventoryComponent::TryAddStack(const FItemStack& InStack, int32& OutAdded
     for (int32 i = 0; i < Slots.Num() && Remaining > 0; i++)
     {
         FItemStack& Slot = Slots[i];
-        if (!Slot.Item)  // ← Item으로 수정
+        if (!Slot.Item)
         {
-            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack);  // ← Item으로 수정
+            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack);
             if (CanAddWeight(CanAdd * SingleWeight))
             {
-                Slot.Item = InStack.Item;  // ← Item으로 수정
+                Slot.Item = InStack.Item;
                 Slot.Count = CanAdd;
                 Remaining -= CanAdd;
                 OutAdded += CanAdd;
@@ -153,23 +155,23 @@ bool UInventoryComponent::TrySplit(int32 FromIdx, int32 NumToSplit, int32 ToIdx)
     FItemStack& From = Slots[FromIdx];
     FItemStack& To = Slots[ToIdx];
 
-    if (!From.Item || From.Count < NumToSplit || NumToSplit <= 0)  // ← Item으로 수정
+    if (!From.Item || From.Count < NumToSplit || NumToSplit <= 0)
     {
         return false;
     }
 
-    if (To.Item)  // ← Item으로 수정
+    if (To.Item)
     {
         return false;
     }
 
-    To.Item = From.Item;  // ← Item으로 수정
+    To.Item = From.Item;
     To.Count = NumToSplit;
     From.Count -= NumToSplit;
 
     if (From.Count <= 0)
     {
-        From.Item = nullptr;  // ← Item으로 수정
+        From.Item = nullptr;
         From.Count = 0;
     }
 
@@ -191,7 +193,7 @@ bool UInventoryComponent::RemoveAt(int32 Index, int32 Count)
     }
 
     FItemStack& Slot = Slots[Index];
-    if (!Slot.Item || Slot.Count < Count)  // ← Item으로 수정
+    if (!Slot.Item || Slot.Count < Count)
     {
         return false;
     }
@@ -199,7 +201,7 @@ bool UInventoryComponent::RemoveAt(int32 Index, int32 Count)
     Slot.Count -= Count;
     if (Slot.Count <= 0)
     {
-        Slot.Item = nullptr;  // ← Item으로 수정
+        Slot.Item = nullptr;
         Slot.Count = 0;
     }
 
@@ -222,13 +224,13 @@ bool UInventoryComponent::TransferFrom(UInventoryComponent* From, int32 FromIdx,
     }
 
     FItemStack& FromSlot = From->Slots[FromIdx];
-    if (!FromSlot.Item || FromSlot.Count < Count)  // ← Item으로 수정
+    if (!FromSlot.Item || FromSlot.Count < Count)
     {
         return false;
     }
 
     FItemStack TransferStack;
-    TransferStack.Item = FromSlot.Item;  // ← Item으로 수정
+    TransferStack.Item = FromSlot.Item;
     TransferStack.Count = Count;
 
     int32 Added = 0;
@@ -260,7 +262,7 @@ bool UInventoryComponent::TransferAllFrom(UInventoryComponent* From, int32& OutT
     OutTotalMoved = 0;
     for (int32 i = 0; i < From->Slots.Num(); i++)
     {
-        if (From->Slots[i].Item)  // ← Item으로 수정
+        if (From->Slots[i].Item)
         {
             int32 Moved = 0;
             TransferFrom(From, i, From->Slots[i].Count, Moved);
@@ -290,7 +292,7 @@ bool UInventoryComponent::DropAt(int32 FromIdx, int32 Count, const FTransform& W
     }
 
     FItemStack& Slot = Slots[FromIdx];
-    if (!Slot.Item || Slot.Count < Count)  // ← Item으로 수정
+    if (!Slot.Item || Slot.Count < Count)
     {
         return false;
     }
@@ -307,7 +309,7 @@ bool UInventoryComponent::DropAt(int32 FromIdx, int32 Count, const FTransform& W
     AItemPickup* Pickup = World->SpawnActor<AItemPickup>(PickupClass, WorldTransform, SpawnParams);
     if (Pickup)
     {
-        Pickup->Stack.Item = Slot.Item;  // ← Item으로 수정
+        Pickup->Stack.Item = Slot.Item;
         Pickup->Stack.Count = Count;
 
         RemoveAt(FromIdx, Count);
@@ -320,12 +322,13 @@ bool UInventoryComponent::DropAt(int32 FromIdx, int32 Count, const FTransform& W
 
 void UInventoryComponent::OnRep_Slots()
 {
+    // 클라에서 Slots 복제될 때마다 UI 갱신
     BroadcastUpdated();
 }
 
 void UInventoryComponent::BroadcastUpdated()
 {
-    // UI 쪽으로 "인벤토리 바뀜" 신호 보내기
+    // 🔥 여기서 델리게이트를 실제로 쏴줘야 UMG가 반응함
     OnInventoryUpdated.Broadcast();
 }
 
@@ -347,7 +350,7 @@ void UInventoryComponent::ScheduleSave()
     }
 
     World->GetTimerManager().ClearTimer(SaveDebounceTimer);
-    
+
     World->GetTimerManager().SetTimer(
         SaveDebounceTimer,
         this,
@@ -355,7 +358,7 @@ void UInventoryComponent::ScheduleSave()
         SaveDebounceDelay,
         false
     );
-    
+
     UE_LOG(LogTemp, Verbose, TEXT("Save scheduled in %.1f seconds"), SaveDebounceDelay);
 }
 
@@ -403,12 +406,11 @@ void UInventoryComponent::ManualSave()
         {
             World->GetTimerManager().ClearTimer(SaveDebounceTimer);
         }
-    
+
         SaveInventoryToServer();
         UE_LOG(LogTemp, Log, TEXT("💾 Manual save triggered"));
     }
 }
-
 
 // ============================================================
 // 서버 RPC 구현

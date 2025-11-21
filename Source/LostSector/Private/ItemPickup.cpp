@@ -12,11 +12,17 @@ AItemPickup::AItemPickup()
 
     StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
     SetRootComponent(StaticMeshComp);
-    StaticMeshComp->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+
+    
+    StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    StaticMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+    StaticMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
-    SkeletalMeshComp->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
+    SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    SkeletalMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+    SkeletalMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     SkeletalMeshComp->SetVisibility(false, true);
 }
 
@@ -68,18 +74,39 @@ void AItemPickup::ApplyVisualFromData()
 
 void AItemPickup::Interact(ACharacter* ByWho)
 {
-    if (!ByWho || GetLocalRole() != ROLE_Authority || !Stack.IsValid()) return;
-    if (FVector::Dist(ByWho->GetActorLocation(), GetActorLocation()) > MaxUseDistance) return;
+    UE_LOG(LogTemp, Warning, TEXT("AItemPickup::Interact called"));  // 👈 실제로 호출되는지
+
+    if (!ByWho || GetLocalRole() != ROLE_Authority) return;
+    if (!Stack.IsValid())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Stack invalid"));
+        return;
+    }
+
+    if (FVector::Dist(ByWho->GetActorLocation(), GetActorLocation()) > MaxUseDistance)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Too far"));
+        return;
+    }
 
     if (UInventoryComponent* Inv = ByWho->FindComponentByClass<UInventoryComponent>())
     {
         int32 Added = 0;
         Inv->TryAddStack(Stack, Added);
+        UE_LOG(LogTemp, Warning, TEXT("TryAddStack Added = %d"), Added);
+
         if (Added > 0)
         {
             Stack.Count -= Added;
-            if (Stack.Count <= 0) Destroy();
-            else OnRep_Stack(); // 서버에서도 외형 최신화(부분 남았을 때)
+            if (Stack.Count <= 0)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Destroy pickup"));
+                Destroy();
+            }
         }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No InventoryComponent on character"));
     }
 }
