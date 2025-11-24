@@ -9,6 +9,7 @@
 #include "Weapon.generated.h"
 
 class AATracer;
+class UAnimMontage;
 UCLASS()
 class LOSTSECTOR_API AWeapon : public AActor
 {
@@ -47,6 +48,9 @@ protected:
     // Hit Impact Niagara System (È÷Æ® ÀÓÆÑÆ®)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Effects")
     UNiagaraSystem* HitImpactFX;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Weapon|Animation")
+    TObjectPtr<UAnimMontage> FireAnimMontage;
 public:
 
     // ÃÑ±â ¿ÜÇü (Static Mesh)

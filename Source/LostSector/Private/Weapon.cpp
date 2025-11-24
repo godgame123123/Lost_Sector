@@ -9,6 +9,7 @@
 #include "NiagaraComponent.h"
 #include "Components/SkeletalMeshComponent.h" // 스켈레탈 메시 컴포넌트 접근을 위해
 #include "ATracer.h"
+#include "Animation/AnimInstance.h"
 
 AWeapon::AWeapon()
 {
@@ -206,6 +207,32 @@ void AWeapon::Fire(FVector Direction)
     // 발사 로직 실행
     bCanFire = false;
     CurrentAmmo--;
+
+    // ----------------------------------------------------
+    // [핵심] 여기에 애니메이션 재생 로직 삽입!
+    // ----------------------------------------------------
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (OwnerPawn && FireAnimMontage) // FireAnimMontage는 AWeapon.h에 선언되어 있어야 함
+    {
+        // 1. 발사자의 메쉬 컴포넌트 찾기 (캐릭터의 몸통 메쉬)
+        // 주의: 캐릭터 클래스에 따라 Mesh 컴포넌트 이름이 다를 수 있습니다.
+        USkeletalMeshComponent* CharacterMesh = OwnerPawn->FindComponentByClass<USkeletalMeshComponent>();
+
+        // 보다 안전한 방법: 캐릭터 클래스에서 직접 메쉬를 가져오거나, GetMesh() 함수를 사용
+        // 예시: AYourCharacter* Character = Cast<AYourCharacter>(OwnerPawn);
+        //       if (Character) { CharacterMesh = Character->GetMesh(); }
+
+        if (CharacterMesh)
+        {
+            UAnimInstance* AnimInstance = CharacterMesh->GetAnimInstance();
+
+            // 2. 몽타주 재생 (재생 속도 1.0f)
+            if (AnimInstance)
+            {
+                AnimInstance->Montage_Play(FireAnimMontage, 1.0f);
+            }
+        }
+    }
 
     // ----------------------------------------------------
     // [핵심] 총알 분산 (Aim Spread) 로직 적용
