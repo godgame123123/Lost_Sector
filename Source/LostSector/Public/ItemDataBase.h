@@ -21,6 +21,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     FText DisplayName;
 
+    // ✔ 아이콘은 이것만 유지 (중복 제거)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     UTexture2D* Icon = nullptr;
 
@@ -33,7 +34,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     EItemType Type = EItemType::Junk;
 
-    // ✅ 새로 추가해야 하는 부분
+    // === Visual ===
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
     TSoftObjectPtr<UStaticMesh> WorldStaticMesh;
 
@@ -44,12 +45,12 @@ public:
     FRotator WorldMeshRotation = FRotator::ZeroRotator;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
-    FVector  WorldMeshOffset = FVector::ZeroVector;
+    FVector WorldMeshOffset = FVector::ZeroVector;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual", meta = (ClampMin = "0.001"))
-    float    WorldMeshScale = 1.0f;
+    float WorldMeshScale = 1.0f;
 
-    // (가치 추가 필드도 같이 유지)
+    // === Economy ===
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Economy")
     int32 Value = 0;
 };
