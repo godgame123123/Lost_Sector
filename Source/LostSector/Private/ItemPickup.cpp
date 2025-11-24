@@ -74,7 +74,7 @@ void AItemPickup::ApplyVisualFromData()
 
 void AItemPickup::Interact(ACharacter* ByWho)
 {
-    UE_LOG(LogTemp, Warning, TEXT("AItemPickup::Interact called"));  // 👈 실제로 호출되는지
+    UE_LOG(LogTemp, Warning, TEXT(" Pickup Interact (Authority=%d)"), GetLocalRole() == ROLE_Authority);
 
     if (!ByWho || GetLocalRole() != ROLE_Authority) return;
     if (!Stack.IsValid())

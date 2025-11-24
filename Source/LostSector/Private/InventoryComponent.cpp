@@ -35,7 +35,8 @@ void UInventoryComponent::InitSlots()
         Slots.Add(FItemStack());
     }
 
-    BroadcastUpdated();    // 초기 슬롯 생성 시에도 UI 갱신
+    // 초기 슬롯 생성 시에도 UI 갱신
+    BroadcastUpdated();
 }
 
 float UInventoryComponent::GetTotalWeight() const
@@ -320,21 +321,25 @@ bool UInventoryComponent::DropAt(int32 FromIdx, int32 Count, const FTransform& W
     return false;
 }
 
+// =============================
+// RepNotify + 델리게이트
+// =============================
+
 void UInventoryComponent::OnRep_Slots()
 {
-    // 클라에서 Slots 복제될 때마다 UI 갱신
+    UE_LOG(LogTemp, Warning, TEXT("OnRep_Slots called on client"));
     BroadcastUpdated();
 }
 
 void UInventoryComponent::BroadcastUpdated()
 {
-    // 🔥 여기서 델리게이트를 실제로 쏴줘야 UMG가 반응함
+    UE_LOG(LogTemp, Warning, TEXT("BroadcastUpdated -> OnInventoryUpdated.Broadcast()"));
     OnInventoryUpdated.Broadcast();
 }
 
-// ============================================================
+// =============================
 // 저장 시스템
-// ============================================================
+// =============================
 
 void UInventoryComponent::ScheduleSave()
 {
@@ -412,9 +417,9 @@ void UInventoryComponent::ManualSave()
     }
 }
 
-// ============================================================
+// =============================
 // 서버 RPC 구현
-// ============================================================
+// =============================
 
 void UInventoryComponent::Server_TryAddStack_Implementation(const FItemStack& InStack)
 {
