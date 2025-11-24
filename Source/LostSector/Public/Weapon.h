@@ -19,7 +19,7 @@ public:
 	// Sets default values for this actor's properties
 	AWeapon();
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Stats")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
     float Damage = 10.0f;           // 기본 데미지
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
@@ -89,7 +89,7 @@ protected:
     float LastFireTime = 0.0f;
 
     // [추가] 연속 발사 타이밍 (이 시간 안에 다시 쏘면 연사로 간주)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon Stats")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
     float SpreadResetDuration = 0.2f; // FireRate보다 약간 길게 설정 (예: 0.1f)
 
     virtual void BeginPlay() override;
