@@ -12,17 +12,18 @@ public:
     UInteractionComponent();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
-    float Range = 350.f;   // 기본 350~500이 좋은 값
+    float Range = 200.f;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Interaction")
-    float SphereRadius = 25.f;  // SphereTrace 반경(30이상도 가능)
+    float SphereRadius = 30.f;
 
     UFUNCTION(BlueprintCallable)
-    void Use();   // 클라이언트가 호출하는 함수
+    void Use();
 
 protected:
-    UFUNCTION(Server, Reliable)
-    void Server_Use(const FVector_NetQuantize& EyeLoc, const FRotator& EyeRot);
-
     virtual void BeginPlay() override;
+
+    // 캐릭터 중심 상호작용용 서버 RPC
+    UFUNCTION(Server, Reliable)
+    void Server_Use(const FVector_NetQuantize& StartLoc, const FRotator& FacingRot);
 };
