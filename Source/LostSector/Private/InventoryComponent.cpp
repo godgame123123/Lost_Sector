@@ -510,6 +510,64 @@ int32 UInventoryComponent::GetItemCountByItemData(UItemDataBase* ItemData) const
     return GetItemCountByItemId(ItemData->ItemId);
 }
 
+int32 UInventoryComponent::RemoveItemByItemData(UItemDataBase* ItemData, int32 Count)
+{
+    // 서버에서만 실행되도록 권한 체크
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return 0;
+    }
+
+    if (!ItemData || Count <= 0)
+    {
+        return 0;
+    }
+
+    int32 RemainingToRemove = Count;
+    int32 RemovedTotal = 0;
+
+    // 인벤토리 슬롯을 순회하며 아이템 제거
+    for (int32 i = 0; i < Slots.Num() && RemainingToRemove > 0; i++)
+    {
+        FItemStack& Slot = Slots[i];
+
+        // Item 포인터 또는 ItemId가 일치하는지 확인
+        if (Slot.Item == ItemData || Slot.ItemId == ItemData->ItemId)
+        {
+            // 이 슬롯에서 제거할 수 있는 최대 수량 계산
+            int32 ToRemove = FMath::Min(RemainingToRemove, Slot.Count);
+
+            Slot.Count -= ToRemove;
+            RemainingToRemove -= ToRemove;
+            RemovedTotal += ToRemove;
+
+            // 슬롯의 아이템이 0개가 되면 슬롯을 비웁니다.
+            if (Slot.Count <= 0)
+            {
+                Slot.Item = nullptr;
+                Slot.ItemId = NAME_None;
+                Slot.Count = 0;
+            }
+        }
+    }
+
+    // 실제로 제거된 아이템이 있다면 UI 갱신 및 저장 스케줄링
+    if (RemovedTotal > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Removed %d of ItemId: %s from inventory."), RemovedTotal, *ItemData->ItemId.ToString());
+        BroadcastUpdated();
+        ScheduleSave();
+    }
+
+    // 요청된 수량(Count)과 실제 제거된 수량(RemovedTotal)이 다를 경우 로그 경고를 남길 수도 있습니다.
+    if (RemainingToRemove > 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RemoveItemByItemData: Could not remove full amount. Requested: %d, Removed: %d"), Count, RemovedTotal);
+    }
+
+    return RemovedTotal;
+}
+
 bool UInventoryComponent::ConsumeAmmo(UItemDataBase* AmmoItemData, int32 Amount)
 {
     if (GetOwnerRole() != ROLE_Authority)
