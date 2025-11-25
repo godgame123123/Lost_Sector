@@ -4,6 +4,8 @@
 #include "InventorySaveManager.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "ItemDataBase.h"
+#include "Engine/AssetManager.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -328,7 +330,68 @@ bool UInventoryComponent::DropAt(int32 FromIdx, int32 Count, const FTransform& W
 void UInventoryComponent::OnRep_Slots()
 {
     UE_LOG(LogTemp, Warning, TEXT("OnRep_Slots called on client"));
+    // 클라에서 Slots 복제될 때 Item 포인터가 nullptr일 수 있으므로 ItemId로 복원
+    RestoreItemPointers();
     BroadcastUpdated();
+}
+
+void UInventoryComponent::RestoreItemPointers()
+{
+    UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+    if (!AssetManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RestoreItemPointers: AssetManager not available"));
+        return;
+    }
+
+    int32 RestoredCount = 0;
+    for (FItemStack& Slot : Slots)
+    {
+        // Item 포인터가 nullptr이고 ItemId가 유효한 경우 복원
+        if (!Slot.Item && Slot.ItemId != NAME_None)
+        {
+            // PrimaryDataAsset을 ItemId로 로드
+            FPrimaryAssetType PrimaryAssetType = UItemDataBase::StaticClass()->GetFName();
+            FPrimaryAssetId PrimaryAssetId = FPrimaryAssetId(PrimaryAssetType, Slot.ItemId);
+            UItemDataBase* LoadedItem = Cast<UItemDataBase>(AssetManager->GetPrimaryAssetObject(PrimaryAssetId));
+            
+            if (LoadedItem)
+            {
+                Slot.Item = LoadedItem;
+                RestoredCount++;
+                UE_LOG(LogTemp, Log, TEXT("✅ Restored item pointer for ItemId: %s"), *Slot.ItemId.ToString());
+            }
+            else
+            {
+                // 동기 로드 시도
+                TSharedPtr<FStreamableHandle> Handle = AssetManager->LoadPrimaryAsset(PrimaryAssetId, TArray<FName>());
+                if (Handle.IsValid())
+                {
+                    Handle->WaitUntilComplete();
+                    LoadedItem = Cast<UItemDataBase>(AssetManager->GetPrimaryAssetObject(PrimaryAssetId));
+                    if (LoadedItem)
+                    {
+                        Slot.Item = LoadedItem;
+                        RestoredCount++;
+                        UE_LOG(LogTemp, Log, TEXT("✅ Restored item pointer (sync load) for ItemId: %s"), *Slot.ItemId.ToString());
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("❌ Failed to restore item pointer for ItemId: %s"), *Slot.ItemId.ToString());
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("❌ Failed to create load handle for ItemId: %s"), *Slot.ItemId.ToString());
+                }
+            }
+        }
+    }
+    
+    if (RestoredCount > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Restored %d item pointers"), RestoredCount);
+    }
 }
 
 void UInventoryComponent::BroadcastUpdated()
@@ -415,6 +478,34 @@ void UInventoryComponent::ManualSave()
         SaveInventoryToServer();
         UE_LOG(LogTemp, Log, TEXT("💾 Manual save triggered"));
     }
+}
+
+void UInventoryComponent::DebugPrintInventory() const
+{
+    int32 ValidSlots = 0;
+    float TotalWeight = 0.f;
+    
+    UE_LOG(LogTemp, Warning, TEXT("=== 인벤토리 상태 ==="));
+    UE_LOG(LogTemp, Warning, TEXT("총 슬롯 수: %d"), Slots.Num());
+    
+    for (int32 i = 0; i < Slots.Num(); i++)
+    {
+        const FItemStack& Slot = Slots[i];
+        if (Slot.Item && Slot.Count > 0)
+        {
+            ValidSlots++;
+            TotalWeight += Slot.Item->Weight * Slot.Count;
+            UE_LOG(LogTemp, Warning, TEXT("  Slot[%d]: ItemId=%s, Count=%d, Weight=%.2f"), 
+                i, 
+                Slot.ItemId != NAME_None ? *Slot.ItemId.ToString() : TEXT("NULL"),
+                Slot.Count,
+                Slot.Item->Weight * Slot.Count);
+        }
+    }
+    
+    UE_LOG(LogTemp, Warning, TEXT("유효 슬롯: %d / %d"), ValidSlots, Slots.Num());
+    UE_LOG(LogTemp, Warning, TEXT("총 무게: %.2f / %.2f"), TotalWeight, WeightLimit);
+    UE_LOG(LogTemp, Warning, TEXT("===================="));
 }
 
 // =============================

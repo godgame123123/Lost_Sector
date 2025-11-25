@@ -68,6 +68,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "Inventory|Save")
     void ManualSave();
 
+    // ItemId로 Item 포인터 복원 (JSON 로드 후 사용)
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void RestoreItemPointers();
+
+    // UI 업데이트 브로드캐스트 (JSON 로드 후 사용)
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    void BroadcastUpdated();
+
+    // 디버깅: 인벤토리 상태 출력
+    UFUNCTION(BlueprintCallable, Category = "Inventory|Debug")
+    void DebugPrintInventory() const;
+
 protected:
     virtual void BeginPlay() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -99,9 +111,6 @@ protected:
 private:
     bool CanAddWeight(float AddW) const;
     FORCEINLINE bool ValidIndex(int32 I) const { return Slots.IsValidIndex(I); }
-
-    // 슬롯이 변경되면 항상 이 함수에서 델리게이트 브로드캐스트
-    void BroadcastUpdated();
 
     // 디바운스 저장 관련
     FTimerHandle SaveDebounceTimer;
