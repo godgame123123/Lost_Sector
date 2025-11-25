@@ -326,16 +326,55 @@ void AWeapon::Fire(FVector Direction)
 
 void AWeapon::WeaponReload()
 {
+    // 1. 이미 최대 탄약이라면 재장전 불필요
     if (CurrentAmmo >= MaxAmmo)
     {
         UE_LOG(LogTemp, Log, TEXT("%s: Ammo is already full (%d/%d)."), *GetName(), CurrentAmmo, MaxAmmo);
         return;
     }
 
-    // 재장전 몽타주는 요청에 따라 생략합니다.
+    // 2. 소유자(Pawn)와 인벤토리 컴포넌트 찾기
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (!OwnerPawn || !RequiredAmmoItemData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Reload Failed: Missing OwnerPawn or RequiredAmmoItemData."));
+        return;
+    }
 
-    UE_LOG(LogTemp, Warning, TEXT("%s: Reload initiated. Needs %d ammo."),
-        *GetName(), MaxAmmo - CurrentAmmo);
-    // TODO: 여기에 UInventoryComponent를 찾고, RequiredAmmoItemData를 사용하여 
-    // 인벤토리에서 탄약을 제거한 뒤 CurrentAmmo를 보충하는 핵심 로직이 들어갑니다.
+    UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
+    if (!InventoryComp)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Reload Failed: Owner has no UInventoryComponent."));
+        return;
+    }
+
+    // 3. 필요한 탄약 수 계산 및 인벤토리에서 사용 가능한 총알 수 확인
+    int32 AmmoNeeded = MaxAmmo - CurrentAmmo;
+    int32 AvailableAmmo = InventoryComp->GetItemCountByItemData(RequiredAmmoItemData);
+
+    if (AvailableAmmo <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Reload Failed: No available ammo in inventory."));
+        return;
+    }
+
+    // 4. 실제로 인벤토리에서 가져올/제거할 탄약 수 결정
+    int32 AmmoToTake = FMath::Min(AmmoNeeded, AvailableAmmo);
+
+    // 5. 인벤토리에서 탄약 제거 요청 (인벤토리 함수는 서버 권한으로 실행됨)
+    // UInventoryComponent에 Add/Remove 로직이 서버 권한으로 분리되어 있다면,
+    // 클라이언트에서 이 함수를 호출할 경우 내부적으로 RPC가 발생합니다.
+    int32 RemovedCount = InventoryComp->RemoveItemByItemData(RequiredAmmoItemData, AmmoToTake);
+
+    // 6. 탄창 업데이트
+    if (RemovedCount > 0)
+    {
+        CurrentAmmo += RemovedCount;
+        UE_LOG(LogTemp, Log, TEXT("%s: Reloaded %d rounds. New Ammo: %d/%d. Inventory Count: %d"),
+            *GetName(), RemovedCount, CurrentAmmo, MaxAmmo, AvailableAmmo - RemovedCount);
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("Reload Error: Inventory refused to remove ammo unexpectedly."));
+    }
 }

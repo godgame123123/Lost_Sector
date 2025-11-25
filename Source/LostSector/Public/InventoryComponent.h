@@ -107,6 +107,9 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
     int32 GetItemCountByItemData(UItemDataBase* ItemData) const;
 
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    int32 RemoveItemByItemData(UItemDataBase* ItemData, int32 Count);
+
     // 총알 소비 (발사 시 사용)
     UFUNCTION(BlueprintCallable, Category = "Inventory")
     bool ConsumeAmmo(UItemDataBase* AmmoItemData, int32 Amount);
