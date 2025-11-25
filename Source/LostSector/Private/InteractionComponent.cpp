@@ -19,33 +19,33 @@ void UInteractionComponent::Use()
 {
     if (ACharacter* C = Cast<ACharacter>(GetOwner()))
     {
-        FVector EyeLoc;
-        FRotator EyeRot;
+        // 서버에게 캐릭터 위치와 방향 전달
+        FVector Start = C->GetActorLocation();
+        FVector Forward = C->GetActorForwardVector();
 
-        C->GetActorEyesViewPoint(EyeLoc, EyeRot);
-
-        Server_Use(EyeLoc, EyeRot); // 서버 호출
+        Server_Use(Start, Forward.Rotation());
     }
 }
 
 void UInteractionComponent::Server_Use_Implementation(
-    const FVector_NetQuantize& EyeLoc,
-    const FRotator& EyeRot)
+    const FVector_NetQuantize& StartLoc,
+    const FRotator& FacingRot)
 {
     ACharacter* C = Cast<ACharacter>(GetOwner());
     if (!C) return;
 
-    FVector End = EyeLoc + EyeRot.Vector() * Range;
+    // 캐릭터 기준 방향
+    FVector Forward = FacingRot.Vector();
+    FVector End = StartLoc + Forward * Range;
 
     FHitResult Hit;
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(C);
     Params.bTraceComplex = true;
 
-    //  핵심: LineTrace → SphereTrace 로 변경해서 부드러운 상호작용 구현
     bool bHit = GetWorld()->SweepSingleByChannel(
         Hit,
-        EyeLoc,
+        StartLoc,
         End,
         FQuat::Identity,
         ECC_Visibility,
@@ -53,17 +53,17 @@ void UInteractionComponent::Server_Use_Implementation(
         Params
     );
 
-    //  디버그 표시 (원하면 삭제)
-    // DrawDebugSphere(GetWorld(), Hit.Location, SphereRadius, 12, FColor::Green, false, 1.5f);
-    // DrawDebugLine(GetWorld(), EyeLoc, End, FColor::Yellow, false, 1.5f);
+    // 디버그용
+    //DrawDebugSphere(GetWorld(), Hit.Location, SphereRadius, 12, FColor::Cyan, false, 1.5f);
+    //DrawDebugLine(GetWorld(), StartLoc, End, FColor::Blue, false, 1.5f);
 
     if (!bHit) return;
+
     AActor* Target = Hit.GetActor();
     if (!Target) return;
 
     UE_LOG(LogTemp, Warning, TEXT("Interaction Hit: %s"), *Target->GetName());
 
-    // 인터페이스 실행
     if (Target->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
     {
         if (IInteractable* I = Cast<IInteractable>(Target))
