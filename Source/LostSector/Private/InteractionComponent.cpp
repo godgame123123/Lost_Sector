@@ -1,6 +1,7 @@
 #include "InteractionComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
+#include "DrawDebugHelpers.h"
 #include "Interactable.h"
 
 UInteractionComponent::UInteractionComponent()
@@ -16,43 +17,57 @@ void UInteractionComponent::BeginPlay()
 
 void UInteractionComponent::Use()
 {
-    UE_LOG(LogTemp, Warning, TEXT("Use() called"));  //  E키가 여기까지 오는지
-
     if (ACharacter* C = Cast<ACharacter>(GetOwner()))
     {
-        FVector L;
-        FRotator R;
-        C->GetActorEyesViewPoint(L, R);
-        Server_Use(L, R);
+        FVector EyeLoc;
+        FRotator EyeRot;
+
+        C->GetActorEyesViewPoint(EyeLoc, EyeRot);
+
+        Server_Use(EyeLoc, EyeRot); // 서버 호출
     }
 }
 
-void UInteractionComponent::Server_Use_Implementation(const FVector_NetQuantize& EyeLoc, const FRotator& EyeRot)
+void UInteractionComponent::Server_Use_Implementation(
+    const FVector_NetQuantize& EyeLoc,
+    const FRotator& EyeRot)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Server_Use_Implementation"));  // 서버 RPC 호출 여부
-
     ACharacter* C = Cast<ACharacter>(GetOwner());
     if (!C) return;
 
-    const FVector End = EyeLoc + EyeRot.Vector() * Range;
+    FVector End = EyeLoc + EyeRot.Vector() * Range;
 
     FHitResult Hit;
-    FCollisionQueryParams Params(SCENE_QUERY_STAT(UseTrace), false, C);
-    bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, EyeLoc, End, ECC_Visibility, Params);
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(C);
+    Params.bTraceComplex = true;
 
-    UE_LOG(LogTemp, Warning, TEXT("Trace hit: %s"),
-        (bHit && Hit.GetActor()) ? *Hit.GetActor()->GetName() : TEXT("None"));  
+    //  핵심: LineTrace → SphereTrace 로 변경해서 부드러운 상호작용 구현
+    bool bHit = GetWorld()->SweepSingleByChannel(
+        Hit,
+        EyeLoc,
+        End,
+        FQuat::Identity,
+        ECC_Visibility,
+        FCollisionShape::MakeSphere(SphereRadius),
+        Params
+    );
 
+    //  디버그 표시 (원하면 삭제)
+    // DrawDebugSphere(GetWorld(), Hit.Location, SphereRadius, 12, FColor::Green, false, 1.5f);
+    // DrawDebugLine(GetWorld(), EyeLoc, End, FColor::Yellow, false, 1.5f);
+
+    if (!bHit) return;
     AActor* Target = Hit.GetActor();
     if (!Target) return;
 
+    UE_LOG(LogTemp, Warning, TEXT("Interaction Hit: %s"), *Target->GetName());
+
+    // 인터페이스 실행
     if (Target->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Target implements Interactable"));
-
         if (IInteractable* I = Cast<IInteractable>(Target))
         {
-            UE_LOG(LogTemp, Warning, TEXT("Calling Interact()"));
             I->Interact(C);
         }
     }
