@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "ItemDataBase.h"
 #include "Engine/AssetManager.h"
+#include "LostSectorCharacter.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -20,6 +21,7 @@ void UInventoryComponent::BeginPlay()
     if (GetOwnerRole() == ROLE_Authority)
     {
         InitSlots();
+        InitStorageSlots();
     }
 }
 
@@ -27,18 +29,201 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(UInventoryComponent, Slots);
+    DOREPLIFETIME(UInventoryComponent, StorageSlots);
+    DOREPLIFETIME(UInventoryComponent, ExpandedSlotCount);
 }
 
 void UInventoryComponent::InitSlots()
 {
+    int32 TotalSlots = BaseSlotCount + ExpandedSlotCount;
     Slots.Empty();
-    for (int32 i = 0; i < SlotCount; i++)
+    for (int32 i = 0; i < TotalSlots; i++)
     {
         Slots.Add(FItemStack());
     }
 
     // 초기 슬롯 생성 시에도 UI 갱신
     BroadcastUpdated();
+}
+
+void UInventoryComponent::InitStorageSlots()
+{
+    StorageSlots.Empty();
+    const int32 StorageSlotCount = 30;
+    for (int32 i = 0; i < StorageSlotCount; i++)
+    {
+        StorageSlots.Add(FItemStack());
+    }
+}
+
+bool UInventoryComponent::ExpandInventoryWithBag(int32 AdditionalSlots)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    if (AdditionalSlots <= 0 || ExpandedSlotCount + AdditionalSlots > MaxExpandedSlots)
+    {
+        return false;
+    }
+
+    ExpandedSlotCount += AdditionalSlots;
+    
+    // 기존 슬롯 유지하면서 새 슬롯 추가
+    int32 CurrentCount = Slots.Num();
+    int32 NewCount = BaseSlotCount + ExpandedSlotCount;
+    
+    // 슬롯 확장
+    for (int32 i = CurrentCount; i < NewCount; i++)
+    {
+        Slots.Add(FItemStack());
+    }
+
+    BroadcastUpdated();
+    ScheduleSave();
+    return true;
+}
+
+bool UInventoryComponent::ShrinkInventory(int32 SlotsToRemove)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    if (SlotsToRemove <= 0 || ExpandedSlotCount < SlotsToRemove)
+    {
+        return false;
+    }
+
+    int32 NewExpandedCount = ExpandedSlotCount - SlotsToRemove;
+    int32 NewTotalSlots = BaseSlotCount + NewExpandedCount;
+    
+    // 확장 슬롯에 아이템이 있는지 확인
+    int32 CurrentTotalSlots = Slots.Num();
+    for (int32 i = NewTotalSlots; i < CurrentTotalSlots; i++)
+    {
+        if (Slots[i].Item && Slots[i].Count > 0)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Cannot shrink inventory: items in expanded slots"));
+            return false;
+        }
+    }
+
+    ExpandedSlotCount = NewExpandedCount;
+    Slots.SetNum(NewTotalSlots);
+
+    BroadcastUpdated();
+    ScheduleSave();
+    return true;
+}
+
+bool UInventoryComponent::TryAddToStorage(const FItemStack& InStack, int32& OutAdded)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        OutAdded = 0;
+        return false;
+    }
+
+    if (!InStack.Item || InStack.Count <= 0)
+    {
+        OutAdded = 0;
+        return false;
+    }
+
+    int32 Remaining = InStack.Count;
+    OutAdded = 0;
+
+    // 1단계: 기존 스택에 추가
+    for (int32 i = 0; i < StorageSlots.Num() && Remaining > 0; i++)
+    {
+        FItemStack& Slot = StorageSlots[i];
+        if (Slot.Item == InStack.Item && Slot.Count < InStack.Item->MaxStack)
+        {
+            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack - Slot.Count);
+            Slot.Count += CanAdd;
+            Remaining -= CanAdd;
+            OutAdded += CanAdd;
+        }
+    }
+
+    // 2단계: 빈 슬롯에 추가
+    for (int32 i = 0; i < StorageSlots.Num() && Remaining > 0; i++)
+    {
+        FItemStack& Slot = StorageSlots[i];
+        if (!Slot.Item)
+        {
+            int32 CanAdd = FMath::Min(Remaining, InStack.Item->MaxStack);
+            Slot.Item = InStack.Item;
+            Slot.ItemId = InStack.Item ? InStack.Item->ItemId : InStack.ItemId;
+            Slot.Count = CanAdd;
+            Remaining -= CanAdd;
+            OutAdded += CanAdd;
+        }
+    }
+
+    bool bSuccess = (OutAdded > 0);
+    if (bSuccess)
+    {
+        BroadcastUpdated();
+        ScheduleSave();
+    }
+
+    return bSuccess;
+}
+
+bool UInventoryComponent::RemoveFromStorage(int32 Index, int32 Count)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    if (!ValidStorageIndex(Index))
+    {
+        return false;
+    }
+
+    FItemStack& Slot = StorageSlots[Index];
+    if (!Slot.Item || Slot.Count < Count)
+    {
+        return false;
+    }
+
+    Slot.Count -= Count;
+    if (Slot.Count <= 0)
+    {
+        Slot.Item = nullptr;
+        Slot.ItemId = NAME_None;
+        Slot.Count = 0;
+    }
+
+    BroadcastUpdated();
+    ScheduleSave();
+    return true;
+}
+
+bool UInventoryComponent::TryMoveStorage(int32 FromIdx, int32 ToIdx)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    if (!ValidStorageIndex(FromIdx) || !ValidStorageIndex(ToIdx) || FromIdx == ToIdx)
+    {
+        return false;
+    }
+
+    FItemStack Temp = StorageSlots[FromIdx];
+    StorageSlots[FromIdx] = StorageSlots[ToIdx];
+    StorageSlots[ToIdx] = Temp;
+
+    BroadcastUpdated();
+    ScheduleSave();
+    return true;
 }
 
 float UInventoryComponent::GetTotalWeight() const
@@ -103,6 +288,7 @@ bool UInventoryComponent::TryAddStack(const FItemStack& InStack, int32& OutAdded
             if (CanAddWeight(CanAdd * SingleWeight))
             {
                 Slot.Item = InStack.Item;
+                Slot.ItemId = InStack.Item ? InStack.Item->ItemId : InStack.ItemId;
                 Slot.Count = CanAdd;
                 Remaining -= CanAdd;
                 OutAdded += CanAdd;
@@ -205,7 +391,162 @@ bool UInventoryComponent::RemoveAt(int32 Index, int32 Count)
     if (Slot.Count <= 0)
     {
         Slot.Item = nullptr;
+        Slot.ItemId = NAME_None;
         Slot.Count = 0;
+    }
+
+    BroadcastUpdated();
+    ScheduleSave();
+    return true;
+}
+
+bool UInventoryComponent::UseItem(int32 Index)
+{
+    if (GetOwnerRole() < ROLE_Authority)
+    {
+        Server_UseItem(Index);
+        return false;
+    }
+
+    if (!ValidIndex(Index))
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: Invalid index %d"), Index);
+        return false;
+    }
+
+    FItemStack& Slot = Slots[Index];
+    if (!Slot.Item || Slot.Count <= 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: No item at index %d"), Index);
+        return false;
+    }
+
+    // 소비 가능한 아이템인지 확인
+    if (!Slot.Item->IsConsumable())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: Item %s is not consumable"), *Slot.Item->DisplayName.ToString());
+        return false;
+    }
+
+    // 캐릭터 가져오기
+    ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
+    if (!Character)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: Owner is not a LostSectorCharacter"));
+        return false;
+    }
+
+    // 아이템 효과 적용
+    bool bEffectApplied = false;
+    
+    if (Slot.Item->HealAmount > 0.f)
+    {
+        float MaxHp = 100.f; // TODO: 최대 체력을 캐릭터에서 가져오기
+        Character->CharacterStats.Hp = FMath::Min(MaxHp, Character->CharacterStats.Hp + Slot.Item->HealAmount);
+        bEffectApplied = true;
+        UE_LOG(LogTemp, Log, TEXT("✅ Healed %f HP. Current HP: %f"), Slot.Item->HealAmount, Character->CharacterStats.Hp);
+    }
+
+    if (Slot.Item->StaminaAmount > 0.f)
+    {
+        float MaxStamina = 100.f; // TODO: 최대 스태미나를 캐릭터에서 가져오기
+        Character->CharacterStats.Stamina = FMath::Min(MaxStamina, Character->CharacterStats.Stamina + Slot.Item->StaminaAmount);
+        bEffectApplied = true;
+        UE_LOG(LogTemp, Log, TEXT("✅ Restored %f Stamina. Current Stamina: %f"), Slot.Item->StaminaAmount, Character->CharacterStats.Stamina);
+    }
+
+    if (Slot.Item->HungerAmount > 0.f)
+    {
+        float MaxHunger = 100.f; // TODO: 최대 배고픔을 캐릭터에서 가져오기
+        Character->CharacterStats.hungry = FMath::Min(MaxHunger, Character->CharacterStats.hungry + Slot.Item->HungerAmount);
+        bEffectApplied = true;
+        UE_LOG(LogTemp, Log, TEXT("✅ Restored %f Hunger. Current Hunger: %f"), Slot.Item->HungerAmount, Character->CharacterStats.hungry);
+    }
+
+    if (!bEffectApplied)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("UseItem: Item has no effect"));
+        return false;
+    }
+
+    // 아이템 개수 감소 (1개 사용)
+    Slot.Count -= 1;
+    if (Slot.Count <= 0)
+    {
+        Slot.Item = nullptr;
+        Slot.ItemId = NAME_None;
+        Slot.Count = 0;
+    }
+
+    BroadcastUpdated();
+    ScheduleSave(); // JSON 파일에 자동 저장
+    UE_LOG(LogTemp, Log, TEXT("✅ Item used. Remaining count: %d"), Slot.Count);
+    
+    return true;
+}
+
+int32 UInventoryComponent::GetItemCountByItemId(FName ItemId) const
+{
+    int32 TotalCount = 0;
+    
+    for (const FItemStack& Slot : Slots)
+    {
+        if (Slot.ItemId == ItemId && Slot.Count > 0)
+        {
+            TotalCount += Slot.Count;
+        }
+    }
+    
+    return TotalCount;
+}
+
+int32 UInventoryComponent::GetItemCountByItemData(UItemDataBase* ItemData) const
+{
+    if (!ItemData)
+    {
+        return 0;
+    }
+    
+    return GetItemCountByItemId(ItemData->ItemId);
+}
+
+bool UInventoryComponent::ConsumeAmmo(UItemDataBase* AmmoItemData, int32 Amount)
+{
+    if (GetOwnerRole() != ROLE_Authority)
+    {
+        return false;
+    }
+
+    if (!AmmoItemData || Amount <= 0)
+    {
+        return false;
+    }
+
+    int32 Remaining = Amount;
+
+    // 인벤토리에서 총알 찾아서 소비
+    for (int32 i = 0; i < Slots.Num() && Remaining > 0; i++)
+    {
+        FItemStack& Slot = Slots[i];
+        if (Slot.Item == AmmoItemData || Slot.ItemId == AmmoItemData->ItemId)
+        {
+            int32 ToConsume = FMath::Min(Remaining, Slot.Count);
+            Slot.Count -= ToConsume;
+            Remaining -= ToConsume;
+
+            if (Slot.Count <= 0)
+            {
+                Slot.Item = nullptr;
+                Slot.ItemId = NAME_None;
+                Slot.Count = 0;
+            }
+        }
+    }
+
+    if (Remaining > 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("ConsumeAmmo: Not enough ammo. Requested: %d, Consumed: %d"), Amount, Amount - Remaining);
+        return false;
     }
 
     BroadcastUpdated();
@@ -335,6 +676,14 @@ void UInventoryComponent::OnRep_Slots()
     BroadcastUpdated();
 }
 
+void UInventoryComponent::OnRep_StorageSlots()
+{
+    UE_LOG(LogTemp, Warning, TEXT("OnRep_StorageSlots called on client"));
+    // 클라에서 StorageSlots 복제될 때 Item 포인터 복원
+    RestoreStorageItemPointers();
+    BroadcastUpdated();
+}
+
 void UInventoryComponent::RestoreItemPointers()
 {
     UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
@@ -391,6 +740,65 @@ void UInventoryComponent::RestoreItemPointers()
     if (RestoredCount > 0)
     {
         UE_LOG(LogTemp, Log, TEXT("Restored %d item pointers"), RestoredCount);
+    }
+}
+
+void UInventoryComponent::RestoreStorageItemPointers()
+{
+    UAssetManager* AssetManager = UAssetManager::GetIfInitialized();
+    if (!AssetManager)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("RestoreStorageItemPointers: AssetManager not available"));
+        return;
+    }
+
+    int32 RestoredCount = 0;
+    for (FItemStack& Slot : StorageSlots)
+    {
+        // Item 포인터가 nullptr이고 ItemId가 유효한 경우 복원
+        if (!Slot.Item && Slot.ItemId != NAME_None)
+        {
+            // PrimaryDataAsset을 ItemId로 로드
+            FPrimaryAssetType PrimaryAssetType = UItemDataBase::StaticClass()->GetFName();
+            FPrimaryAssetId PrimaryAssetId = FPrimaryAssetId(PrimaryAssetType, Slot.ItemId);
+            UItemDataBase* LoadedItem = Cast<UItemDataBase>(AssetManager->GetPrimaryAssetObject(PrimaryAssetId));
+            
+            if (LoadedItem)
+            {
+                Slot.Item = LoadedItem;
+                RestoredCount++;
+                UE_LOG(LogTemp, Log, TEXT("✅ Restored storage item pointer for ItemId: %s"), *Slot.ItemId.ToString());
+            }
+            else
+            {
+                // 동기 로드 시도
+                TSharedPtr<FStreamableHandle> Handle = AssetManager->LoadPrimaryAsset(PrimaryAssetId, TArray<FName>());
+                if (Handle.IsValid())
+                {
+                    Handle->WaitUntilComplete();
+                    LoadedItem = Cast<UItemDataBase>(AssetManager->GetPrimaryAssetObject(PrimaryAssetId));
+                    if (LoadedItem)
+                    {
+                        Slot.Item = LoadedItem;
+                        RestoredCount++;
+                        UE_LOG(LogTemp, Log, TEXT("✅ Restored storage item pointer (sync load) for ItemId: %s"), *Slot.ItemId.ToString());
+                    }
+                    else
+                    {
+                        UE_LOG(LogTemp, Warning, TEXT("❌ Failed to restore storage item pointer for ItemId: %s"), *Slot.ItemId.ToString());
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("❌ Failed to create load handle for storage ItemId: %s"), *Slot.ItemId.ToString());
+                }
+            }
+        }
+    }
+    
+    if (RestoredCount > 0)
+    {
+        UE_LOG(LogTemp, Log, TEXT("Restored %d storage item pointers"), RestoredCount);
     }
 }
 
@@ -459,10 +867,26 @@ void UInventoryComponent::SaveInventoryToServer()
         PlayerID = FString::Printf(TEXT("Local_%d"), PC->PlayerState->GetPlayerId());
     }
 
-    TArray<FItemStack> EmptyStorage;
-    if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, Slots, EmptyStorage))
+    // ItemId 설정 (저장 전에 Item 포인터에서 ItemId 추출)
+    for (FItemStack& Stack : Slots)
     {
-        UE_LOG(LogTemp, Log, TEXT("⚡ Debounced save completed for: %s"), *PlayerID);
+        if (Stack.Item && Stack.ItemId == NAME_None)
+        {
+            Stack.ItemId = Stack.Item->ItemId;
+        }
+    }
+    for (FItemStack& Stack : StorageSlots)
+    {
+        if (Stack.Item && Stack.ItemId == NAME_None)
+        {
+            Stack.ItemId = Stack.Item->ItemId;
+        }
+    }
+
+    if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, Slots, StorageSlots))
+    {
+        UE_LOG(LogTemp, Log, TEXT("⚡ Debounced save completed for: %s (Inventory: %d, Storage: %d)"), 
+            *PlayerID, Slots.Num(), StorageSlots.Num());
     }
 }
 
@@ -543,4 +967,9 @@ void UInventoryComponent::Server_TransferAllFrom_Implementation(UInventoryCompon
 void UInventoryComponent::Server_DropAt_Implementation(int32 FromIdx, int32 Count, const FTransform& Xform, TSubclassOf<AItemPickup> PickupClass)
 {
     DropAt(FromIdx, Count, Xform, PickupClass);
+}
+
+void UInventoryComponent::Server_UseItem_Implementation(int32 Index)
+{
+    UseItem(Index);
 }

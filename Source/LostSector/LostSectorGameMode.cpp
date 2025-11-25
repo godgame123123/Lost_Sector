@@ -71,17 +71,20 @@ void ALostSectorGameMode::PostLogin(APlayerController* NewPlayer)
 		{
 			if (UInventoryComponent* InventoryComp = PlayerPawn->FindComponentByClass<UInventoryComponent>())
 			{
+				// 인벤토리 슬롯 복원
 				InventoryComp->Slots = LoadedData.InventorySlots;
-				UE_LOG(LogTemp, Log, TEXT("✅ Inventory restored: %d items"), LoadedData.InventorySlots.Num());
+				UE_LOG(LogTemp, Log, TEXT("✅ Inventory restored: %d slots"), LoadedData.InventorySlots.Num());
+				
+				// 창고 슬롯 복원
+				InventoryComp->StorageSlots = LoadedData.StorageSlots;
+				UE_LOG(LogTemp, Log, TEXT("✅ Storage restored: %d slots"), LoadedData.StorageSlots.Num());
 				
 				// JSON에서 로드한 후 Item 포인터가 nullptr이므로 ItemId로 복원
 				InventoryComp->RestoreItemPointers();
+				InventoryComp->RestoreStorageItemPointers();
 				
 				// UI 업데이트
 				InventoryComp->BroadcastUpdated();
-				
-				// TODO: 창고 데이터도 복원
-				// StorageComponent->Slots = LoadedData.StorageSlots;
 			}
 		}
 	}
@@ -95,6 +98,7 @@ void ALostSectorGameMode::PostLogin(APlayerController* NewPlayer)
 			if (UInventoryComponent* InventoryComp = PlayerPawn->FindComponentByClass<UInventoryComponent>())
 			{
 				InventoryComp->InitSlots();
+				InventoryComp->InitStorageSlots();
 			}
 		}
 	}
@@ -127,13 +131,27 @@ void ALostSectorGameMode::Logout(AController* Exiting)
 			// InventoryComponent 데이터 저장 (InventorySaveManager 사용)
 			if (UInventoryComponent* InventoryComp = PC->GetPawn()->FindComponentByClass<UInventoryComponent>())
 			{
-				// TODO: 창고 데이터도 함께 저장
-				TArray<FItemStack> EmptyStorage;
+				// ItemId 설정 (저장 전에 Item 포인터에서 ItemId 추출)
+				for (FItemStack& Stack : InventoryComp->Slots)
+				{
+					if (Stack.Item && Stack.ItemId == NAME_None)
+					{
+						Stack.ItemId = Stack.Item->ItemId;
+					}
+				}
+				for (FItemStack& Stack : InventoryComp->StorageSlots)
+				{
+					if (Stack.Item && Stack.ItemId == NAME_None)
+					{
+						Stack.ItemId = Stack.Item->ItemId;
+					}
+				}
 				
 				if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, 
-					InventoryComp->Slots, EmptyStorage))
+					InventoryComp->Slots, InventoryComp->StorageSlots))
 				{
-					UE_LOG(LogTemp, Log, TEXT("💾 InventoryComponent data saved on logout: %s"), *PlayerID);
+					UE_LOG(LogTemp, Log, TEXT("💾 InventoryComponent data saved on logout: %s (Inventory: %d, Storage: %d)"), 
+						*PlayerID, InventoryComp->Slots.Num(), InventoryComp->StorageSlots.Num());
 				}
 			}
 		}

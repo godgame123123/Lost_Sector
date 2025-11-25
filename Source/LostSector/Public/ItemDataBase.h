@@ -53,4 +53,21 @@ public:
     // === Economy ===
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Economy")
     int32 Value = 0;
+
+    // === Item Effects (for consumables) ===
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+    float HealAmount = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+    float StaminaAmount = 0.f;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
+    float HungerAmount = 0.f;
+
+    // 아이템이 사용 가능한지 확인
+    UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Item")
+    bool IsConsumable() const
+    {
+        return Type == EItemType::Heal || Type == EItemType::Food;
+    }
 };
