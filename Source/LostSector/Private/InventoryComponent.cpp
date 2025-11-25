@@ -6,7 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "ItemDataBase.h"
 #include "Engine/AssetManager.h"
-#include "LostSectorCharacter.h"
+#include "../LostSectorCharacter.h"
 
 UInventoryComponent::UInventoryComponent()
 {

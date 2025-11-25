@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Particles/ParticleSystem.h" // UParticleSystem ´ë½Å Fx.h¸¦ »ç¿ëÇÏ´Â °æ¿ì ³ªÀÌ¾Æ°¡¶ó Çì´õ°¡ ÇÊ¿äÇÕ´Ï´Ù.
-#include "NiagaraSystem.h" // ³ªÀÌ¾Æ°¡¶ó ½Ã½ºÅÛÀ» À§ÇÑ Çì´õ
+#include "Particles/ParticleSystem.h" // UParticleSystem ï¿½ï¿½ï¿½ Fx.hï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Ï´ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾Æ°ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê¿ï¿½ï¿½Õ´Ï´ï¿½.
+#include "NiagaraSystem.h" // ï¿½ï¿½ï¿½Ì¾Æ°ï¿½ï¿½ï¿½ ï¿½Ã½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+#include "ItemDataBase.h"
 #include "Weapon.generated.h"
 
 class AATracer;
@@ -20,32 +21,32 @@ public:
 	AWeapon();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    float Damage = 10.0f;           // ±âº» µ¥¹ÌÁö
+    float Damage = 10.0f;           // ï¿½âº» ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    float MaxRange = 5000.0f;       // ÃÖ´ë »ç°Å¸® (¶óÀÎ Æ®·¹ÀÌ½º ±æÀÌ)
+    float MaxRange = 5000.0f;       // ï¿½Ö´ï¿½ ï¿½ï¿½Å¸ï¿½ (ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ ï¿½ï¿½ï¿½ï¿½)
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    float FireRate = 0.1f;          // ¿¬»ç ¼Óµµ (¹ß»ç µô·¹ÀÌ, ÃÊ)
+    float FireRate = 0.1f;          // ï¿½ï¿½ï¿½ï¿½ ï¿½Óµï¿½ (ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½)
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    int32 MaxAmmo = 30;             // ÅºÃ¢ Å©±â
+    int32 MaxAmmo = 30;             // ÅºÃ¢ Å©ï¿½ï¿½
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-	float NoiseRange;               // ¼ÒÀ½ ¹üÀ§
+	float NoiseRange;               // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    float SpreadAngle = 2.0f;       // ÃÑ¾Ë ºÐ»ê °¢µµ
+    float SpreadAngle = 2.0f;       // ï¿½Ñ¾ï¿½ ï¿½Ð»ï¿½ ï¿½ï¿½ï¿½ï¿½
 
 protected:
-    // Muzzle Flash Niagara System (ÃÑ±¸ È­¿°)
+    // Muzzle Flash Niagara System (ï¿½Ñ±ï¿½ È­ï¿½ï¿½)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Effects")
     UNiagaraSystem* MuzzleFlashFX;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Effects")
-    TSubclassOf<AATracer> TracerActorClass; // Ãæ¾Ë±ËÀû
+    TSubclassOf<AATracer> TracerActorClass; // ï¿½ï¿½Ë±ï¿½ï¿½ï¿½
 
-    // Hit Impact Niagara System (È÷Æ® ÀÓÆÑÆ®)
+    // Hit Impact Niagara System (ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½Æ®)
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon|Effects")
     UNiagaraSystem* HitImpactFX;
 
@@ -53,35 +54,35 @@ protected:
     TObjectPtr<UAnimMontage> FireAnimMontage;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    TObjectPtr<class UItemData> RequiredAmmoItemData;
+    TObjectPtr<UItemDataBase> RequiredAmmoItemData;
 public:
 
-    // ÃÑ±â ¿ÜÇü (Static Mesh)
+    // ï¿½Ñ±ï¿½ ï¿½ï¿½ï¿½ï¿½ (Static Mesh)
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
     TObjectPtr<class UStaticMeshComponent> WeaponMesh;
 
-    // ÃÑ±¸ À§Ä¡¸¦ Àâ±â À§ÇÑ ÄÄÆ÷³ÍÆ®
+    // ï¿½Ñ±ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     UPROPERTY(VisibleAnywhere, Category = "Mesh")
     TObjectPtr<USceneComponent> MuzzleLocation;
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     USceneComponent* GetMuzzleLocation() const { return MuzzleLocation; }
 
-    // ÇöÀç Åº¾à ¼ö´Â °ÔÀÓ Áß º¯ÇÏ¹Ç·Î EditableÀÌ ¾Æ´Ñ VisibleAnywhere·Î ¼³Á¤
+    // ï¿½ï¿½ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ï¹Ç·ï¿½ Editableï¿½ï¿½ ï¿½Æ´ï¿½ VisibleAnywhereï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
     int32 CurrentAmmo;
 
-    // ¹ß»ç ±â´É (Input ActionÀÌ³ª AI ·ÎÁ÷¿¡¼­ È£Ãâ)
+    // ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ (Input Actionï¿½Ì³ï¿½ AI ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È£ï¿½ï¿½)
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void Fire(FVector Direction);
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Customization")
-    FVector MeshOffsetLocation; // ¼ÒÄÏ ±âÁØ »ó´ë À§Ä¡ ÀÌµ¿
+    FVector MeshOffsetLocation; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½Ìµï¿½
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Customization")
-    FRotator MeshOffsetRotation; // ¼ÒÄÏ ±âÁØ »ó´ë È¸Àü º¸Á¤
+    FRotator MeshOffsetRotation; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-    // ÃÑ¼Ò¸® ¹× ÀÌÆåÆ® Àç»ýÀ» À§ÇØ ºí·çÇÁ¸°Æ®¿¡¼­ ±¸ÇöÇÒ ÀÌº¥Æ® (Report Noise Event ¿¬°á¿ë)
+    // ï¿½Ñ¼Ò¸ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ìºï¿½Æ® (Report Noise Event ï¿½ï¿½ï¿½ï¿½ï¿½)
     UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
     void OnFireEvent();
 
@@ -91,12 +92,12 @@ protected:
     FTimerHandle FireRateTimerHandle;
     bool bCanFire = true;
 
-    // [Ãß°¡] ¸¶Áö¸· ¹ß»ç ½Ã°£ ±â·Ï
+    // [ï¿½ß°ï¿½] ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½
     float LastFireTime = 0.0f;
 
-    // [Ãß°¡] ¿¬¼Ó ¹ß»ç Å¸ÀÌ¹Ö (ÀÌ ½Ã°£ ¾È¿¡ ´Ù½Ã ½î¸é ¿¬»ç·Î °£ÁÖ)
+    // [ï¿½ß°ï¿½] ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ Å¸ï¿½Ì¹ï¿½ (ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½È¿ï¿½ ï¿½Ù½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    float SpreadResetDuration = 0.2f; // FireRateº¸´Ù ¾à°£ ±æ°Ô ¼³Á¤ (¿¹: 0.1f)
+    float SpreadResetDuration = 0.2f; // FireRateï¿½ï¿½ï¿½ï¿½ ï¿½à°£ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½: 0.1f)
 
     virtual void BeginPlay() override;
     void ResetFire();
