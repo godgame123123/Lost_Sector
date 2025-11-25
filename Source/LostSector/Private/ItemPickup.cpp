@@ -1,5 +1,5 @@
 ﻿#include "ItemPickup.h"
-#include "ItemDataBase.h"                       // ✅ DataAsset 필드 접근용
+#include "ItemDataBase.h"                       
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "InventoryComponent.h"
@@ -10,19 +10,39 @@ AItemPickup::AItemPickup()
 {
     bReplicates = true;
 
+    // -----------------------------
+    // Static Mesh Component (Root)
+    // -----------------------------
     StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
     SetRootComponent(StaticMeshComp);
 
-    
+    // 🔥 핵심 개선: 전체 Mesh 충돌 감지되도록 설정
     StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     StaticMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     StaticMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 
+    StaticMeshComp->SetGenerateOverlapEvents(true);
+    StaticMeshComp->SetCollisionObjectType(ECC_WorldDynamic);
+
+    // 🔥 이거 켜야 SphereTrace / 라인트레이스가 "메쉬 전체"에 닿음
+    StaticMeshComp->bTraceComplexOnMove = true;
+    StaticMeshComp->bReturnMaterialOnMove = true;
+
+
+    // -----------------------------
+    // Skeletal Mesh Component
+    // -----------------------------
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
+
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     SkeletalMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     SkeletalMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+
+    SkeletalMeshComp->SetGenerateOverlapEvents(true);
+    SkeletalMeshComp->bTraceComplexOnMove = true;
+    SkeletalMeshComp->bReturnMaterialOnMove = true;
+
     SkeletalMeshComp->SetVisibility(false, true);
 }
 
@@ -32,31 +52,28 @@ void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
     DOREPLIFETIME(AItemPickup, Stack);
 }
 
-// 레벨에 놓거나 Details에서 값 바꿀 때 바로 반영
 void AItemPickup::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
     ApplyVisualFromData();
 }
 
-// 클라에서 Stack 복제되면 외형 갱신
 void AItemPickup::OnRep_Stack()
 {
     ApplyVisualFromData();
 }
 
+
 void AItemPickup::ApplyVisualFromData()
 {
-    // 기본 숨김
     StaticMeshComp->SetVisibility(false, true);
     SkeletalMeshComp->SetVisibility(false, true);
 
     if (!Stack.Item) return;
 
-    // DataAsset에 넣어둔 메쉬/보정값을 적용
     if (Stack.Item->WorldStaticMesh)
     {
-        StaticMeshComp->SetStaticMesh(Stack.Item->WorldStaticMesh.Get()); // TSoftObjectPtr이면 .Get() 또는 LoadSynchronous()
+        StaticMeshComp->SetStaticMesh(Stack.Item->WorldStaticMesh.Get());
         StaticMeshComp->SetRelativeRotation(Stack.Item->WorldMeshRotation);
         StaticMeshComp->SetRelativeLocation(Stack.Item->WorldMeshOffset);
         StaticMeshComp->SetRelativeScale3D(FVector(Stack.Item->WorldMeshScale));
@@ -71,18 +88,20 @@ void AItemPickup::ApplyVisualFromData()
         SkeletalMeshComp->SetVisibility(true, true);
     }
 }
+
 void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
-    // 강제로 (0,0,0) 되지 않도록 방지 — 위치 리셋 없음
+    // 위치 강제 리셋 방지 (0,0,0로 튀는 현상 대응)
 }
-
 
 void AItemPickup::Interact(ACharacter* ByWho)
 {
-    UE_LOG(LogTemp, Warning, TEXT(" Pickup Interact (Authority=%d)"), GetLocalRole() == ROLE_Authority);
+    UE_LOG(LogTemp, Warning, TEXT("Pickup Interact (Authority=%d)"), GetLocalRole() == ROLE_Authority);
 
-    if (!ByWho || GetLocalRole() != ROLE_Authority) return;
+    if (!ByWho || GetLocalRole() != ROLE_Authority)
+        return;
+
     if (!Stack.IsValid())
     {
         UE_LOG(LogTemp, Warning, TEXT("Stack invalid"));
