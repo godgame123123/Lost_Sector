@@ -10,8 +10,7 @@
 #include "Components/SkeletalMeshComponent.h" // 스켈레탈 메시 컴포넌트 접근을 위해
 #include "ATracer.h"
 #include "Animation/AnimInstance.h"
-#include "InventoryComponent.h" // UInventoryComponent가 정의된 헤더
-#include "ItemDataBase.h"       // UItemDataBase가 정의된 헤더
+#include "InventoryComponent.h"
 
 AWeapon::AWeapon()
 {
@@ -29,82 +28,6 @@ AWeapon::AWeapon()
     MuzzleLocation->SetupAttachment(WeaponMesh.Get());
 
     NoiseRange = 5000.0f;
-}
-
-void AWeapon::WeaponReload()
-{
-    // 1. 재장전 조건 확인
-    // 현재 탄약이 가득 찼거나, 어떤 탄약 아이템을 쓸지 설정되지 않았다면 재장전 불가
-    if (CurrentAmmo == MaxAmmo || !RequiredAmmoItemData)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Reload Blocked: Max Ammo (%d) or No Required Ammo Data."), MaxAmmo);
-        return;
-    }
-
-    // 2. 인벤토리 컴포넌트 접근 및 유효성 검사
-    APawn* OwnerPawn = Cast<APawn>(GetOwner());
-    if (!OwnerPawn) return;
-
-    UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
-    if (!InventoryComp) return;
-
-    // **TODO:** 인벤토리에서 필요한 탄약이 0개인지 확인하는 로직 추가 필요
-
-    // 4. 타이머 설정 (애니메이션이 끝난 후 탄약 교체 로직 실행)
-    // ReloadDuration (AWeapon.h에 선언된 재장전 시간 변수)
-    GetWorld()->GetTimerManager().SetTimer(
-        ReloadTimerHandle,
-        this,
-        &AWeapon::ExecuteReloadLogic,
-        ReloadDuration,
-        false
-    );
-
-    UE_LOG(LogTemp, Log, TEXT("Reload initiated. Duration: %.2fs"), ReloadDuration);
-}
-
-void AWeapon::ExecuteReloadLogic()
-{
-    // 1. 필요한 탄약량 계산
-    const int32 AmmoNeeded = MaxAmmo - CurrentAmmo;
-    if (AmmoNeeded <= 0) return;    
-
-    APawn* OwnerPawn = Cast<APawn>(GetOwner());
-    if (!OwnerPawn) return;
-
-    UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
-    if (!InventoryComp) return;
-
-    // 2. 인벤토리에서 탄약 찾기 및 제거
-    int32 AmmoToTake = 0;
-
-    // **인벤토리 슬롯을 순회하여 탄약 찾기**
-    for (int32 i = 0; i < InventoryComp->Slots.Num(); ++i)
-    {
-        FItemStack& Stack = InventoryComp->Slots[i];
-
-        // 이 슬롯의 아이템이 이 무기가 요구하는 탄약 데이터와 일치하는지 확인
-        if (Stack.IsValid() && Stack.Item == RequiredAmmoItemData)
-        {
-            int32 AvailableAmmo = Stack.Count;
-            AmmoToTake = FMath::Min(AmmoNeeded, AvailableAmmo);
-
-            // 중요: 인벤토리 컴포넌트의 RemoveAt 함수를 사용하여 탄약을 제거합니다.
-            // 인덱스 'i'와 제거할 수량 'AmmoToTake'를 전달합니다.
-            InventoryComp->RemoveAt(i, AmmoToTake);
-
-            break; // 필요한 탄약을 찾았으므로 루프 종료
-        }
-    }
-
-    // 3. 무기 탄창 업데이트
-    CurrentAmmo += AmmoToTake;
-
-    // 4. 재장전 상태 해제 (선택 사항)
-    // bIsReloading = false; // AWeapon.h에 변수를 추가했다면 사용 가능
-
-    UE_LOG(LogTemp, Log, TEXT("Reload Success: Added %d ammo. Current: %d/%d"),
-        AmmoToTake, CurrentAmmo, MaxAmmo);
 }
 
 void AWeapon::BeginPlay()
@@ -261,48 +184,85 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
 
 void AWeapon::Fire(FVector Direction)
 {
-    if (!bCanFire || CurrentAmmo <= 0)
+
+    if (!bCanFire)
     {
-        // [추가] 발사 불가 시 로그 출력
+        UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: bCanFire=false"));
+        return;
+    }
+
+    // CurrentAmmo가 0이면 인벤토리에서 총알 확인
+    if (CurrentAmmo <= 0)
+    {
+        // 인벤토리에서 총알 수량 확인
+        APawn* OwnerPawn = Cast<APawn>(GetOwner());
+        if (OwnerPawn)
+        {
+            UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
+            if (InventoryComp && RequiredAmmoItemData)
+            {
+                int32 AmmoCount = InventoryComp->GetItemCountByItemData(RequiredAmmoItemData);
+                if (AmmoCount <= 0)
+                {
+                    UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: No ammo in inventory. CurrentAmmo=%d, InventoryAmmo=%d"),
+                        CurrentAmmo, AmmoCount);
+                    return;
+                }
+                else
+                {
+                    // 인벤토리에 총알이 있으면 자동으로 재장전 시도
+                    UE_LOG(LogTemp, Log, TEXT("Auto-reload: Found %d ammo in inventory"), AmmoCount);
+                    WeaponReload();
+                    return; // 재장전 중이므로 발사 불가
+                }
+            }
+            else if (!RequiredAmmoItemData)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: No RequiredAmmoItemData set"));
+                return;
+            }
+        }
+
+        UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: CurrentAmmo=%d, No inventory or owner"), CurrentAmmo);
+        return;
+    }
+
+    // 기존 발사 로직 계속
+    if (false) // 이전 체크는 위에서 처리했으므로 여기서는 항상 false
+    {
+        
         UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: bCanFire=%s, Ammo=%d"),
             bCanFire ? TEXT("True") : TEXT("False"), CurrentAmmo);
         return;
     }
 
-    // 1. [핵심] 첫 발 여부 확인
+    
     const float CurrentTime = GetWorld()->GetTimeSeconds();
-    // 마지막 발사 후 SpreadResetDuration보다 긴 시간이 지났다면 첫 발로 간주 (분산 미적용)
+    
     const bool bIsFirstShot = (CurrentTime - LastFireTime > SpreadResetDuration);
 
-    // 2. 마지막 발사 시간 업데이트
+    
     LastFireTime = CurrentTime;
 
-    // [추가] 발사 시작 시 로그 출력
+    
     UE_LOG(LogTemp, Log, TEXT("Fire Start! Ammo Left: %d, First Shot: %s"), CurrentAmmo - 1, bIsFirstShot ? TEXT("True") : TEXT("False"));
 
-    // 발사 로직 실행
+    
     bCanFire = false;
     CurrentAmmo--;
 
-    // ----------------------------------------------------
-    // [핵심] 여기에 애니메이션 재생 로직 삽입!
-    // ----------------------------------------------------
+    
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
-    if (OwnerPawn && FireAnimMontage) // FireAnimMontage는 AWeapon.h에 선언되어 있어야 함
+    if (OwnerPawn && FireAnimMontage) 
     {
-        // 1. 발사자의 메쉬 컴포넌트 찾기 (캐릭터의 몸통 메쉬)
-        // 주의: 캐릭터 클래스에 따라 Mesh 컴포넌트 이름이 다를 수 있습니다.
+        
         USkeletalMeshComponent* CharacterMesh = OwnerPawn->FindComponentByClass<USkeletalMeshComponent>();
-
-        // 보다 안전한 방법: 캐릭터 클래스에서 직접 메쉬를 가져오거나, GetMesh() 함수를 사용
-        // 예시: AYourCharacter* Character = Cast<AYourCharacter>(OwnerPawn);
-        //       if (Character) { CharacterMesh = Character->GetMesh(); }
 
         if (CharacterMesh)
         {
             UAnimInstance* AnimInstance = CharacterMesh->GetAnimInstance();
 
-            // 2. 몽타주 재생 (재생 속도 1.0f)
+            
             if (AnimInstance)
             {
                 AnimInstance->Montage_Play(FireAnimMontage, 1.0f);
@@ -310,53 +270,51 @@ void AWeapon::Fire(FVector Direction)
         }
     }
 
-    // ----------------------------------------------------
-    // [핵심] 총알 분산 (Aim Spread) 로직 적용
-    // ----------------------------------------------------
+    
     FVector StartLocation = MuzzleLocation->GetComponentLocation();
 
-    if (MuzzleLocation) // 총구 위치 컴포넌트가 유효한지 확인
+    if (MuzzleLocation) 
     {
-        if (MuzzleFlashFX) // AWeapon.h에 선언된 UNiagaraSystem* MuzzleFlashFX 변수 사용
+        if (MuzzleFlashFX)
         {
             UNiagaraFunctionLibrary::SpawnSystemAttached(
-                MuzzleFlashFX,                  // 생성할 나이아가라 시스템
-                MuzzleLocation,                 // 부착할 컴포넌트
-                NAME_None,                      // 소켓 이름
-                FVector::ZeroVector,            // 상대 위치 오프셋
-                FRotator::ZeroRotator,          // 상대 회전 오프셋
-                EAttachLocation::SnapToTarget,  // 타겟에 스냅
-                true                            // 자동 파괴
+                MuzzleFlashFX,                  
+                MuzzleLocation,                 
+                NAME_None,                      
+                FVector::ZeroVector,            
+                FRotator::ZeroRotator,         
+                EAttachLocation::SnapToTarget,  
+                true                            
             );
         }
     }
 
-    // 최종 발사 방향을 Direction으로 초기화합니다.
+  
     FVector FinalFireDirection = Direction;
 
-    // 첫 발이 아니거나 (연사 중이거나), SpreadAngle이 0보다 커야 분산을 적용합니다.
+    
     if (!bIsFirstShot && SpreadAngle > 0.0f)
     {
-        // 1. 현재 방향(Direction)을 회전값으로 변환
+        
         const FRotator CurrentRotator = Direction.Rotation();
 
-        // 2. SpreadAngle 범위 내에서 무작위 각도(Yaw, Pitch) 생성
+       
         float RandomYaw = FMath::FRandRange(-SpreadAngle, SpreadAngle);
         float RandomPitch = FMath::FRandRange(-SpreadAngle, SpreadAngle);
 
-        // 3. 현재 회전값에 무작위 분산 각도를 더함
+        
         const FRotator SpreadRotator = CurrentRotator + FRotator(RandomPitch, RandomYaw, 0.0f);
 
-        // 4. 새로운 회전값으로 변환된 최종 발사 방향을 얻음
+        
         FinalFireDirection = UKismetMathLibrary::GetForwardVector(SpreadRotator);
     }
-    // [첫 발인 경우] FinalFireDirection은 Direction 그대로 유지되어 정확하게 발사됩니다.
+  
 
-    PerformLineTrace(StartLocation, FinalFireDirection); // **수정된 방향 전달**
+    PerformLineTrace(StartLocation, FinalFireDirection); 
 
     OnFireEvent();
-    
-    // 연사 속도 타이머 설정
+
+
     GetWorld()->GetTimerManager().SetTimer(
         FireRateTimerHandle,
         this,
@@ -364,6 +322,20 @@ void AWeapon::Fire(FVector Direction)
         FireRate,
         false
     );
+}
 
+void AWeapon::WeaponReload()
+{
+    if (CurrentAmmo >= MaxAmmo)
+    {
+        UE_LOG(LogTemp, Log, TEXT("%s: Ammo is already full (%d/%d)."), *GetName(), CurrentAmmo, MaxAmmo);
+        return;
+    }
 
+    // 재장전 몽타주는 요청에 따라 생략합니다.
+
+    UE_LOG(LogTemp, Warning, TEXT("%s: Reload initiated. Needs %d ammo."),
+        *GetName(), MaxAmmo - CurrentAmmo);
+    // TODO: 여기에 UInventoryComponent를 찾고, RequiredAmmoItemData를 사용하여 
+    // 인벤토리에서 탄약을 제거한 뒤 CurrentAmmo를 보충하는 핵심 로직이 들어갑니다.
 }
