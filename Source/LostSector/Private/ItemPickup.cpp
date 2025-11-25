@@ -71,6 +71,12 @@ void AItemPickup::ApplyVisualFromData()
         SkeletalMeshComp->SetVisibility(true, true);
     }
 }
+void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+    // 강제로 (0,0,0) 되지 않도록 방지 — 위치 리셋 없음
+}
+
 
 void AItemPickup::Interact(ACharacter* ByWho)
 {
