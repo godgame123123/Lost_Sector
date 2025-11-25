@@ -31,6 +31,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Save")
 	void DisableAutoSave();
 
+	// 디버깅: 저장된 파일 정보 출력
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Save|Debug", meta = (WorldContext = "WorldContextObject"))
+	static void DebugPrintSaveFile(UObject* WorldContextObject, const FString& PlayerID);
+
+	// 디버깅: 모든 플레이어 저장 파일 목록 출력
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Save|Debug", meta = (WorldContext = "WorldContextObject"))
+	static void DebugListAllSaveFiles(UObject* WorldContextObject);
+
 private:
 	FTimerHandle AutoSaveTimerHandle;
 	static FString GetSaveFilePath(const FString& PlayerID);

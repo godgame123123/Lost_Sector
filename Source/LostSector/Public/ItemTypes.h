@@ -11,8 +11,19 @@ struct FItemStack          // ← API 매크로 넣지 마세요
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     UItemDataBase* Item = nullptr;
 
+    // ✅ 네트워크 복제를 위해 ItemId 추가 (Item 포인터는 복제되지 않을 수 있음)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    FName ItemId;
+
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     int32 Count = 0;
+
+    // ✅ Item이 설정될 때 ItemId도 함께 업데이트
+    void SetItem(UItemDataBase* InItem)
+    {
+        Item = InItem;
+        ItemId = InItem ? InItem->ItemId : NAME_None;
+    }
 
     bool IsValid() const { return Item != nullptr && Count > 0; }
     bool  IsSame(const FItemStack& O) const { return Item && Item == O.Item; }

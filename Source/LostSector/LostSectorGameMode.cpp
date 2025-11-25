@@ -74,6 +74,12 @@ void ALostSectorGameMode::PostLogin(APlayerController* NewPlayer)
 				InventoryComp->Slots = LoadedData.InventorySlots;
 				UE_LOG(LogTemp, Log, TEXT("✅ Inventory restored: %d items"), LoadedData.InventorySlots.Num());
 				
+				// JSON에서 로드한 후 Item 포인터가 nullptr이므로 ItemId로 복원
+				InventoryComp->RestoreItemPointers();
+				
+				// UI 업데이트
+				InventoryComp->BroadcastUpdated();
+				
 				// TODO: 창고 데이터도 복원
 				// StorageComponent->Slots = LoadedData.StorageSlots;
 			}
