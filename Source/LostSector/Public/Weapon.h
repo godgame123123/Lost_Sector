@@ -81,6 +81,21 @@ public:
     // 총소리 및 이펙트 재생을 위해 블루프린트에서 구현할 이벤트 (Report Noise Event 연결용)
     UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
     void OnFireEvent();
+
+public:
+    // ... (기존 CurrentAmmo, Fire 함수 등) ...
+
+    /** 무기가 사용하는 탄약 아이템의 UItemDataBase* 데이터 */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
+    class UItemDataBase* RequiredAmmoItemData = nullptr; // <--- 어떤 탄약을 쓸지 지정
+
+    /** 재장전 시간 (애니메이션 길이에 맞춰 조정) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
+    float ReloadDuration = 2.0f;
+
+    /** 재장전 함수 (Input에서 호출) */
+    UFUNCTION(BlueprintCallable, Category = "Combat")
+    void WeaponReload();
 protected:
     FTimerHandle FireRateTimerHandle;
     bool bCanFire = true;
@@ -95,6 +110,10 @@ protected:
     virtual void BeginPlay() override;
     void ResetFire();
 
+    FTimerHandle ReloadTimerHandle; // 재장전 타이머
+
+    /** 재장전 애니메이션 끝난 후 실제 탄약 교체 로직 실행 */
+    void ExecuteReloadLogic();
 private:
     void PerformLineTrace(FVector Start, FVector Direction);
 };

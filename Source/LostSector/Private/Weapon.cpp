@@ -10,6 +10,8 @@
 #include "Components/SkeletalMeshComponent.h" // 스켈레탈 메시 컴포넌트 접근을 위해
 #include "ATracer.h"
 #include "Animation/AnimInstance.h"
+#include "InventoryComponent.h" // UInventoryComponent가 정의된 헤더
+#include "ItemDataBase.h"       // UItemDataBase가 정의된 헤더
 
 AWeapon::AWeapon()
 {
@@ -29,6 +31,82 @@ AWeapon::AWeapon()
     NoiseRange = 5000.0f;
 }
 
+void AWeapon::WeaponReload()
+{
+    // 1. 재장전 조건 확인
+    // 현재 탄약이 가득 찼거나, 어떤 탄약 아이템을 쓸지 설정되지 않았다면 재장전 불가
+    if (CurrentAmmo == MaxAmmo || !RequiredAmmoItemData)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Reload Blocked: Max Ammo (%d) or No Required Ammo Data."), MaxAmmo);
+        return;
+    }
+
+    // 2. 인벤토리 컴포넌트 접근 및 유효성 검사
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (!OwnerPawn) return;
+
+    UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
+    if (!InventoryComp) return;
+
+    // **TODO:** 인벤토리에서 필요한 탄약이 0개인지 확인하는 로직 추가 필요
+
+    // 4. 타이머 설정 (애니메이션이 끝난 후 탄약 교체 로직 실행)
+    // ReloadDuration (AWeapon.h에 선언된 재장전 시간 변수)
+    GetWorld()->GetTimerManager().SetTimer(
+        ReloadTimerHandle,
+        this,
+        &AWeapon::ExecuteReloadLogic,
+        ReloadDuration,
+        false
+    );
+
+    UE_LOG(LogTemp, Log, TEXT("Reload initiated. Duration: %.2fs"), ReloadDuration);
+}
+
+void AWeapon::ExecuteReloadLogic()
+{
+    // 1. 필요한 탄약량 계산
+    const int32 AmmoNeeded = MaxAmmo - CurrentAmmo;
+    if (AmmoNeeded <= 0) return;    
+
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (!OwnerPawn) return;
+
+    UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
+    if (!InventoryComp) return;
+
+    // 2. 인벤토리에서 탄약 찾기 및 제거
+    int32 AmmoToTake = 0;
+
+    // **인벤토리 슬롯을 순회하여 탄약 찾기**
+    for (int32 i = 0; i < InventoryComp->Slots.Num(); ++i)
+    {
+        FItemStack& Stack = InventoryComp->Slots[i];
+
+        // 이 슬롯의 아이템이 이 무기가 요구하는 탄약 데이터와 일치하는지 확인
+        if (Stack.IsValid() && Stack.Item == RequiredAmmoItemData)
+        {
+            int32 AvailableAmmo = Stack.Count;
+            AmmoToTake = FMath::Min(AmmoNeeded, AvailableAmmo);
+
+            // 중요: 인벤토리 컴포넌트의 RemoveAt 함수를 사용하여 탄약을 제거합니다.
+            // 인덱스 'i'와 제거할 수량 'AmmoToTake'를 전달합니다.
+            InventoryComp->RemoveAt(i, AmmoToTake);
+
+            break; // 필요한 탄약을 찾았으므로 루프 종료
+        }
+    }
+
+    // 3. 무기 탄창 업데이트
+    CurrentAmmo += AmmoToTake;
+
+    // 4. 재장전 상태 해제 (선택 사항)
+    // bIsReloading = false; // AWeapon.h에 변수를 추가했다면 사용 가능
+
+    UE_LOG(LogTemp, Log, TEXT("Reload Success: Added %d ammo. Current: %d/%d"),
+        AmmoToTake, CurrentAmmo, MaxAmmo);
+}
+
 void AWeapon::BeginPlay()
 {
     Super::BeginPlay();
@@ -43,8 +121,6 @@ void AWeapon::BeginPlay()
         // 2. 스케일도 보정해야 한다면 (총 크기가 다를 경우)
         // WeaponMesh->SetRelativeScale3D(FVector(1.0f)); // 필요한 스케일 값 적용
     }
-    // 초기 탄약 설정
-    CurrentAmmo = MaxAmmo;
 }
 
 void AWeapon::ResetFire()
@@ -288,4 +364,6 @@ void AWeapon::Fire(FVector Direction)
         FireRate,
         false
     );
+
+
 }
