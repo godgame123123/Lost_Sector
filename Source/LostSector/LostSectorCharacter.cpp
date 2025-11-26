@@ -81,6 +81,10 @@ void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Move);
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ALostSectorCharacter::Look);
+		if (ReloadAction)
+		{
+			EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ALostSectorCharacter::Reload);
+		}
 	}
 	else
 	{
@@ -511,6 +515,21 @@ void ALostSectorCharacter::Look(const FInputActionValue& Value)
 		// add yaw and pitch input to controller
 		AddControllerYawInput(LookAxisVector.X);
 		AddControllerPitchInput(LookAxisVector.Y);
+	}
+}
+
+void ALostSectorCharacter::Reload(const FInputActionValue& Value)
+{
+	if (CurrentWeapon)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Reload key pressed. Calling WeaponReload on %s"), *CurrentWeapon->GetName());
+
+		// AWeapon.cpp에서 구현된 WeaponReload 함수 호출
+		CurrentWeapon->WeaponReload();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot reload: No CurrentWeapon equipped."));
 	}
 }
 

@@ -92,8 +92,14 @@ protected:
     FTimerHandle FireRateTimerHandle;
     bool bCanFire = true;
 
-    
     float LastFireTime = 0.0f;
+
+    bool bIsReloading = false;
+
+    void FinishReload();
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
+    float ReloadDuration = 2.0f;
 
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
