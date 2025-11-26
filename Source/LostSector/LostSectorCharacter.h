@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "CharacterDataStructs.h"
+#include "Components/WidgetComponent.h"
 #include "LostSectorCharacter.generated.h"
 
 class USpringArmComponent;
@@ -121,6 +122,7 @@ protected:
 
 	// To add mapping context
 	virtual void BeginPlay();
+
 public:
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
@@ -137,4 +139,13 @@ public:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+protected:
+	// 텍스트 위젯을 캐릭터 머리 위에 띄우기 위한 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> ReloadTextWidgetComponent;
+
+public:
+	// 재장전 텍스트 위젯의 표시 여부를 제어하는 공용 함수
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void SetReloadingTextVisible(bool bShow); // 함수명 변경 (ShowReloadingText 대신 SetReloadingTextVisible 사용)
 };
