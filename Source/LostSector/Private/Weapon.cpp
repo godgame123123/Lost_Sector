@@ -11,6 +11,7 @@
 #include "ATracer.h"
 #include "Animation/AnimInstance.h"
 #include "InventoryComponent.h"
+#include "../LostSectorCharacter.h"
 
 AWeapon::AWeapon()
 {
@@ -340,6 +341,15 @@ void AWeapon::WeaponReload()
     if (CurrentAmmo >= MaxAmmo)
     {
         UE_LOG(LogTemp, Log, TEXT("%s: Ammo is already full (%d/%d)."), *GetName(), CurrentAmmo, MaxAmmo);
+        if (GetWorld()->GetTimerManager().IsTimerActive(ReloadTimerHandle))
+        {
+            GetWorld()->GetTimerManager().ClearTimer(ReloadTimerHandle);
+        }
+        ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
+        if (Character)
+        {
+            Character->SetReloadingTextVisible(false); // 재장전 불필요 시 즉시 위젯 숨김
+        }
         return;
     }
 
@@ -373,8 +383,14 @@ void AWeapon::WeaponReload()
     bIsReloading = true; // 재장전 플래그 설정
     bCanFire = false;    // 재장전 중 발사 방지 (Fire 함수에서 체크)
 
+    ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
+    if (Character)
+    {
+        Character->SetReloadingTextVisible(true);
+    }
+
     GetWorld()->GetTimerManager().SetTimer(
-        FireRateTimerHandle, // 재사용 (타이머 핸들을 따로 두는 것이 더 좋습니다. 예: ReloadTimerHandle)
+        ReloadTimerHandle, // 재사용 (타이머 핸들을 따로 두는 것이 더 좋습니다. 예: ReloadTimerHandle)
         this,
         &AWeapon::FinishReload,
         ReloadDuration, // AWeapon.h에서 정의한 시간 사용
@@ -384,6 +400,12 @@ void AWeapon::WeaponReload()
 
 void AWeapon::FinishReload()
 {
+    ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
+    if (Character)
+    {
+        Character->SetReloadingTextVisible(false);
+    }
+
     // 1. 플래그 해제
     bIsReloading = false;
 

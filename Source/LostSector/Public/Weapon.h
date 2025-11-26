@@ -53,8 +53,7 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Weapon|Animation")
     TObjectPtr<UAnimMontage> FireAnimMontage;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
-    TObjectPtr<UItemDataBase> RequiredAmmoItemData;
+    
 public:
 
     
@@ -88,8 +87,13 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void WeaponReload();
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
+    TObjectPtr<class UItemDataBase> RequiredAmmoItemData;
 protected:
     FTimerHandle FireRateTimerHandle;
+
+    FTimerHandle ReloadTimerHandle;
     bool bCanFire = true;
 
     float LastFireTime = 0.0f;

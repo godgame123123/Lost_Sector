@@ -65,7 +65,19 @@ ALostSectorCharacter::ALostSectorCharacter()
 	CharacterStats.hungry = 100.0f;
 	CharacterStats.weight = 0.0f;
 
-	
+	// [ReloadTextWidgetComponent 생성 및 설정]
+	ReloadTextWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("ReloadTextWidget"));
+	ReloadTextWidgetComponent->SetupAttachment(RootComponent); // 루트 컴포넌트에 부착
+
+	// 캐릭터 머리 위 (예: Z축 110.0f)에 위치 조정
+	ReloadTextWidgetComponent->SetRelativeLocation(FVector(0.0f, 0.0f, -120.0f));
+
+	// 기본적으로 숨김
+	ReloadTextWidgetComponent->SetVisibility(false);
+
+	// 위젯이 항상 카메라를 향하도록 설정 (선택 사항)
+	ReloadTextWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
+	ReloadTextWidgetComponent->SetTwoSided(true);
 }
 
 // Input
@@ -245,6 +257,13 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 
 	}
 }
+void ALostSectorCharacter::SetReloadingTextVisible(bool bShow)
+{
+	if (ReloadTextWidgetComponent)
+	{
+		ReloadTextWidgetComponent->SetVisibility(bShow);
+	}
+}
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
 	if (CharacterStats.Stamina >= StaminaCost)
@@ -366,6 +385,42 @@ void ALostSectorCharacter::EquipWeapon()
 
 	if (CurrentWeapon)
 	{
+		// 1. 현재 탄창을 항상 최대치로 채웁니다. (AI/플레이어 공통)
+		CurrentWeapon->CurrentAmmo = CurrentWeapon->MaxAmmo;
+
+		// 2. 인벤토리 컴포넌트를 가져옵니다.
+		UInventoryComponent* InventoryComp = FindComponentByClass<UInventoryComponent>();
+
+		// 3. 인벤토리 컴포넌트가 있고, 무기가 요구하는 탄약 데이터가 설정되어 있다면
+		if (InventoryComp && CurrentWeapon->RequiredAmmoItemData)
+		{
+			// 플레이어와 AI 모두에게 초기 여분 탄약을 지급합니다.
+			const int32 InitialSpareAmmo = 30;
+
+			// FItemStack을 생성하여 TryAddStack에 전달합니다.
+			FItemStack AmmoStack;
+			AmmoStack.Item = CurrentWeapon->RequiredAmmoItemData;
+			// ItemData에서 ItemId를 안전하게 가져옵니다.
+			if (CurrentWeapon->RequiredAmmoItemData)
+			{
+				AmmoStack.ItemId = CurrentWeapon->RequiredAmmoItemData->ItemId;
+			}
+			AmmoStack.Count = InitialSpareAmmo;
+
+			int32 AddedCount = 0;
+
+			// 인벤토리에 총알 추가 시도 (TryAddStack 사용)
+			if (InventoryComp->TryAddStack(AmmoStack, AddedCount))
+			{
+				UE_LOG(LogTemp, Log, TEXT("%s Equipped Weapon and added %d spare ammo to inventory."),
+					*GetName(), AddedCount);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("%s Equipped Weapon but FAILED to add spare ammo. Check Inventory capacity or ItemData."), *GetName());
+			}
+		}
+
 		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
 		{
 			const FName WeaponSocketName = FName("WeaponSocket");
