@@ -33,7 +33,7 @@ public:
 
     // 총 무게 제한
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
-    float WeightLimit = 30.f;
+    float WeightLimit = 100.f;
 
     // UI에서 바인딩하는 델리게이트
     UPROPERTY(BlueprintAssignable, Category = "Inventory")
