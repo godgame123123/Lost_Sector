@@ -187,6 +187,10 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 
 	UCharacterMovementComponent* MovementComp = GetCharacterMovement();
 
+	if (IsPlayerControlled() && !bIsDead) // 플레이어 제어 중, 살아있을 때만 실행
+	{
+		HandleOcclusionFade();
+	}
 	if (bIsSprinting)
 	{
 		if (MovementComp && !MovementComp->bOrientRotationToMovement)
@@ -257,6 +261,95 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 		SetActorRotation(FRotator(0.0f, NewRotation.Yaw, 0.0f));
 
 	}
+}
+void ALostSectorCharacter::SetActorOpacity(UPrimitiveComponent* MeshComp, float TargetOpacity)
+{
+	if (!MeshComp) return;
+
+	for (int32 i = 0; i < MeshComp->GetNumMaterials(); ++i)
+	{
+		UMaterialInterface* Material = MeshComp->GetMaterial(i);
+		UMaterialInstanceDynamic* DynamicMat = Cast<UMaterialInstanceDynamic>(Material);
+
+		if (!DynamicMat)
+		{
+			// Dynamic Instance가 없다면 새로 만들고 설정합니다.
+			DynamicMat = MeshComp->CreateAndSetMaterialInstanceDynamic(i);
+		}
+
+		if (DynamicMat)
+		{
+			// 재질에 "Opacity"라는 Scalar Parameter가 있어야 합니다.
+			DynamicMat->SetScalarParameterValue(FName("Opacity"), TargetOpacity);
+		}
+	}
+}
+void ALostSectorCharacter::HandleOcclusionFade()
+{
+	if (!CameraBoom) return; // CameraBoom이 없다면 종료
+
+	FVector PlayerLocation = GetActorLocation();
+	FVector CameraLocation = CameraBoom->GetComponentLocation();
+
+	// Line Trace 설정
+	TArray<FHitResult> HitResults;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this); // 캐릭터 자신 무시
+	Params.bReturnPhysicalMaterial = false;
+
+	// Line Trace 실행 (카메라에서 플레이어까지)
+	bool bHit = GetWorld()->LineTraceMultiByChannel(
+		HitResults,
+		CameraLocation,
+		PlayerLocation,
+		ECollisionChannel::ECC_Visibility, // Visibility 채널을 사용
+		Params
+	);
+
+	TArray<AActor*> CurrentOccludingActors;
+
+	// 1. 현재 트레이스에 걸린 액터 투명화
+	for (const FHitResult& Hit : HitResults)
+	{
+		AActor* HitActor = Hit.GetActor();
+		// Static/World Dynamic 액터만 처리합니다. (플레이어나 무기 같은 액터는 제외)
+		if (HitActor && !HitActor->IsA<ACharacter>() && HitActor->GetRootComponent() && HitActor->GetRootComponent()->Mobility == EComponentMobility::Static)
+		{
+			CurrentOccludingActors.Add(HitActor);
+
+			// 2. 액터의 모든 Primitive Component를 투명화 처리
+			TArray<UPrimitiveComponent*> PrimitiveComponents;
+			HitActor->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+			for (UPrimitiveComponent* Component : PrimitiveComponents)
+			{
+				// Opacity 0.3으로 설정 (반투명)
+				SetActorOpacity(Component, 0.3f);
+			}
+
+			// 복구 목록에서 제거 (현재 투명 상태를 유지해야 함)
+			ActorsToRestoreOpacity.Remove(HitActor);
+		}
+	}
+
+	// 3. 이전 프레임에 투명화되었으나 현재는 걸리지 않은 액터 불투명으로 복구
+	for (AActor* ActorToRestore : ActorsToRestoreOpacity)
+	{
+		if (ActorToRestore)
+		{
+			TArray<UPrimitiveComponent*> PrimitiveComponents;
+			ActorToRestore->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+			for (UPrimitiveComponent* Component : PrimitiveComponents)
+			{
+				// Opacity 1.0으로 설정 (불투명)
+				SetActorOpacity(Component, 1.0f);
+			}
+		}
+	}
+
+	// 4. 복구 목록 갱신
+	ActorsToRestoreOpacity = CurrentOccludingActors;
 }
 void ALostSectorCharacter::SetReloadingTextVisible(bool bShow)
 {

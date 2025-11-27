@@ -88,6 +88,7 @@ private:
 
 	FTimerHandle FireTimerHandle;
 
+	void SetActorOpacity(UPrimitiveComponent* MeshComp, float TargetOpacity);
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<class AWeapon> CurrentWeapon;
@@ -159,6 +160,11 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UUserWidget> DeathWidgetInstance;
 
+	UPROPERTY()
+	TArray<AActor*> ActorsToRestoreOpacity;
+
+	// [추가] 투명화 처리 로직을 매 프레임 실행할 함수 선언
+	void HandleOcclusionFade();
 public:
 	// 재장전 텍스트 위젯의 표시 여부를 제어하는 공용 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
