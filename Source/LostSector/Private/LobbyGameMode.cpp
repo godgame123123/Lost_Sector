@@ -26,11 +26,14 @@ ALobbyGameMode::ALobbyGameMode()
 {
     bUseSeamlessTravel = true;
 
-    // Default Pawn Class 설정
-    static ConstructorHelpers::FClassFinder<APawn> PawnClassFinder(TEXT("/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"));
-    if (PawnClassFinder.Succeeded())
+    // Default Pawn Class 설정 (블루프린트에서 설정하지 않은 경우에만 기본값 사용)
+    if (DefaultPawnClass == nullptr)
     {
-        DefaultPawnClass = PawnClassFinder.Class;
+        static ConstructorHelpers::FClassFinder<APawn> PawnClassFinder(TEXT("/Game/Team_Folder/Kimjaehwan/Player/BP_KimjaehwanCharacter"));
+        if (PawnClassFinder.Succeeded())
+        {
+            DefaultPawnClass = PawnClassFinder.Class;
+        }
     }
     
     // Player State Class 설정 - MyPlayerState 사용
