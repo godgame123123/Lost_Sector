@@ -13,6 +13,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class ADeathDropBox;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -109,6 +110,13 @@ public:
 	void Die();
 
 protected:
+	// ADeathDropBox 클래스 사용을 위한 전방 선언
+	//class ADeathDropBox;
+
+	// 스폰할 사망 드롭 박스 블루프린트 클래스를 지정합니다.
+	UPROPERTY(EditDefaultsOnly, Category = "Loot")
+	TSubclassOf<ADeathDropBox> LootContainerClass;
+protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
@@ -143,6 +151,13 @@ protected:
 	// 텍스트 위젯을 캐릭터 머리 위에 띄우기 위한 컴포넌트
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
 	TObjectPtr<UWidgetComponent> ReloadTextWidgetComponent;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UUserWidget> DeathWidgetClass;
+
+	// 생성된 위젯 인스턴스 (메모리 관리용)
+	UPROPERTY()
+	TObjectPtr<class UUserWidget> DeathWidgetInstance;
 
 public:
 	// 재장전 텍스트 위젯의 표시 여부를 제어하는 공용 함수

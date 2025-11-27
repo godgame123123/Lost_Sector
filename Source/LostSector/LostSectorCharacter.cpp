@@ -19,6 +19,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "DeathDropBox.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
@@ -595,55 +596,161 @@ void ALostSectorCharacter::Die()
 	{
 		return;
 	}
-	
+
 	bIsDead = true;
-	
-	UE_LOG(LogTemp, Warning, TEXT("💀 Player %s has died!"), *GetName());
-	
+
+	UE_LOG(LogTemp, Warning, TEXT("💀 Character %s has died!"), *GetName());
+
+	TArray<FItemStack> DroppedItems; // ⬅️ 아이템을 저장할 임시 배열 선언
+
 	// 서버에서만 실행
 	if (HasAuthority())
 	{
 		APlayerController* PC = Cast<APlayerController>(GetController());
-		if (!PC || !PC->PlayerState)
-		{
-			return;
-		}
-		
-		FString PlayerID;
-		if (PC->PlayerState->GetUniqueId().IsValid())
-		{
-			PlayerID = PC->PlayerState->GetUniqueId()->ToString();
-		}
-		else
-		{
-			PlayerID = FString::Printf(TEXT("Local_%d"), PC->PlayerState->GetPlayerId());
-		}
-		
-		// 1. MyPlayerState의 인벤토리 초기화
-		if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
-		{
-			// 서버에서 직접 호출 - RPC를 호출하면 자동으로 Implementation이 실행됨
-			MyPS->Server_ClearInventoryOnDeath();
-		}
-		
-		// 2. InventoryComponent의 인벤토리 초기화
+
+		// 1. InventoryComponent 가져오기
 		if (UInventoryComponent* InventoryComp = FindComponentByClass<UInventoryComponent>())
 		{
+			// 2. 인벤토리 데이터를 DroppedItems에 복사 (아이템 드롭)
+			DroppedItems = InventoryComp->Slots;
+
+			// 3. InventoryComponent의 인벤토리 초기화
 			int32 RemovedCount = InventoryComp->Slots.Num();
 			InventoryComp->Slots.Empty();
 			InventoryComp->InitSlots(); // 빈 슬롯으로 초기화
-			
-			UE_LOG(LogTemp, Warning, TEXT("💀 Cleared %d items from InventoryComponent"), RemovedCount);
-			
-			// InventoryComponent 데이터 저장
-			TArray<FItemStack> EmptyStorage;
-			if (UInventorySaveManager::SavePlayerInventory(this, PlayerID, 
-				InventoryComp->Slots, EmptyStorage))
+
+			UE_LOG(LogTemp, Warning, TEXT("💀 Cleared %d items from InventoryComponent for drop."), RemovedCount);
+
+			// 인벤토리 클리어 후 저장 (이 로직은 기존 코드를 유지)
+			if (PC && PC->PlayerState)
 			{
-				UE_LOG(LogTemp, Log, TEXT("💾 InventoryComponent cleared and saved on death: %s"), *PlayerID);
+				FString PlayerID;
+				if (PC->PlayerState->GetUniqueId().IsValid())
+				{
+					PlayerID = PC->PlayerState->GetUniqueId()->ToString();
+				}
+				else
+				{
+					PlayerID = FString::Printf(TEXT("Local_%d"), PC->PlayerState->GetPlayerId());
+				}
+
+				TArray<FItemStack> EmptyStorage;
+				// UInventorySaveManager를 사용한다고 가정
+				if (UInventorySaveManager::SavePlayerInventory(this, PlayerID,
+					InventoryComp->Slots, EmptyStorage))
+				{
+					UE_LOG(LogTemp, Log, TEXT("💾 InventoryComponent cleared and saved on death: %s"), *PlayerID);
+				}
+			}
+		}
+
+		// 4. LootContainer 스폰 (드롭할 아이템이 있고 클래스가 지정되었을 때만)
+		if (LootContainerClass && DroppedItems.Num() > 0)
+		{
+			FVector SpawnLocation = GetActorLocation();
+			if (GetCapsuleComponent())
+			{
+				// 캡슐 컴포넌트의 절반 높이(Half Height)를 가져와서 Z축에서 뺍니다.
+				float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+				SpawnLocation.Z -= HalfHeight;
+
+				// 상자가 땅속에 너무 깊이 박히는 것을 방지하기 위해 약간 다시 올릴 수도 있습니다 (선택적)
+				// SpawnLocation.Z += 10.0f; 
+			}
+
+			FRotator SpawnRotation = GetActorRotation();
+
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Instigator = GetInstigator();
+
+			ADeathDropBox* DeathBox = GetWorld()->SpawnActor<ADeathDropBox>(
+				LootContainerClass,
+				SpawnLocation,
+				SpawnRotation,
+				SpawnParams
+			);
+
+			if (DeathBox)
+			{
+				// 5. 컨테이너에 아이템 데이터 전달 및 초기화
+				DeathBox->InitializeLoot(DroppedItems);
+				UE_LOG(LogTemp, Log, TEXT("📦 Dropped DeathDropBox with %d unique stacks."), DroppedItems.Num());
+			}
+		}
+
+		// 6. MyPlayerState의 인벤토리 초기화 (기존 로직 유지)
+		if (PC && PC->PlayerState)
+		{
+			if (AMyPlayerState* MyPS = PC->GetPlayerState<AMyPlayerState>())
+			{
+				// 서버에서 직접 호출 (RPC가 자동으로 Implementation을 실행함)
+				MyPS->Server_ClearInventoryOnDeath();
 			}
 		}
 	}
+	// 1. **입력 및 컨트롤 제거**
+	if (AController* CharacterController = GetController())
+	{
+		// 컨트롤러에서 캐릭터 빙의 해제
+		DetachFromControllerPendingDestroy();
+
+		// **플레이어 컨트롤러**라면 입력 모드 변경
+		if (APlayerController* PC = Cast<APlayerController>(CharacterController))
+		{
+			// 2. **UI 전용 입력 모드 설정**
+			// 마우스 커서가 보이고, 게임 입력(이동, 발사)은 무시하며, UI만 상호작용 가능하게 합니다.
+			FInputModeUIOnly InputMode;
+			InputMode.SetWidgetToFocus(nullptr); // 특정 위젯에 포커스를 맞추지 않아도 됩니다.
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+
+			PC->SetInputMode(InputMode);
+
+			// 마우스 커서 보이게 설정
+			PC->bShowMouseCursor = true;
+			if (DeathWidgetClass && PC->IsLocalController())
+			{
+				if (!DeathWidgetInstance)
+				{
+					// 위젯 생성
+					DeathWidgetInstance = CreateWidget<UUserWidget>(PC, DeathWidgetClass);
+
+					if (DeathWidgetInstance)
+					{
+						// 뷰포트에 추가
+						DeathWidgetInstance->AddToViewport();
+						UE_LOG(LogTemp, Log, TEXT("💀 Death Widget added to viewport."));
+					}
+				}
+			}
+		}
+	}
+
+	if (CurrentWeapon)
+	{
+		// 무기를 월드에서 제거합니다.
+		CurrentWeapon->Destroy();
+		CurrentWeapon = nullptr; // 포인터를 비워줍니다.
+		//UE_LOG(LogTemp, Log, TEXT("✅ Weapon %s destroyed on character death."), *CurrentWeapon->GetName());
+	}
+	// 3. **캐릭터 외형 및 물리 처리 (Ragdoll)**
+	// GetMesh()는 서버/클라이언트 모두 복제된 데이터를 가지고 있습니다.
+	if (GetMesh())
+	{
+		// 충돌 프로파일을 Ragdoll로 변경
+		GetMesh()->SetCollisionProfileName(TEXT("Ragdoll"));
+		// 물리 시뮬레이션 활성화 (Ragdoll)
+		GetMesh()->SetSimulatePhysics(true);
+	}
+
+	// 캡슐 컴포넌트 충돌 비활성화 (Ragdoll이 캡슐에 걸리지 않도록)
+	if (GetCapsuleComponent())
+	{
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	// 4.액터 수명 설정
+	// 5초 후 캐릭터 Actor 자체를 월드에서 제거합니다. (아이템 상자는 별개로 존재)
+	SetLifeSpan(5.0f);
 }
 
 void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
