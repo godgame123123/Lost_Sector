@@ -43,7 +43,7 @@ AItemPickup::AItemPickup()
     SkeletalMeshComp->bTraceComplexOnMove = true;
     SkeletalMeshComp->bReturnMaterialOnMove = true;
 
-    SkeletalMeshComp->SetVisibility(false, true);
+   // SkeletalMeshComp->SetVisibility(false, true);
 }
 
 void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -55,7 +55,7 @@ void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 void AItemPickup::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
-    ApplyVisualFromData();
+   // ApplyVisualFromData();
 }
 
 void AItemPickup::OnRep_Stack()
