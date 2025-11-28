@@ -264,22 +264,25 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 }
 void ALostSectorCharacter::SetActorOpacity(UPrimitiveComponent* MeshComp, float TargetOpacity)
 {
-	if (!MeshComp) return;
+	if (!MeshComp || !IsValid(MeshComp)) return; // MeshComp 유효성 확인 추가
 
 	for (int32 i = 0; i < MeshComp->GetNumMaterials(); ++i)
 	{
 		UMaterialInterface* Material = MeshComp->GetMaterial(i);
+
+		// Material이 유효한지 확인
+		if (!Material) continue;
+
 		UMaterialInstanceDynamic* DynamicMat = Cast<UMaterialInstanceDynamic>(Material);
 
 		if (!DynamicMat)
 		{
-			// Dynamic Instance가 없다면 새로 만들고 설정합니다.
+			// CreateAndSetMaterialInstanceDynamic가 실패할 수도 있으므로 확인
 			DynamicMat = MeshComp->CreateAndSetMaterialInstanceDynamic(i);
 		}
 
-		if (DynamicMat)
+		if (DynamicMat && IsValid(DynamicMat)) // DynamicMat 유효성 확인
 		{
-			// 재질에 "Opacity"라는 Scalar Parameter가 있어야 합니다.
 			DynamicMat->SetScalarParameterValue(FName("Opacity"), TargetOpacity);
 		}
 	}
@@ -288,7 +291,7 @@ void ALostSectorCharacter::HandleOcclusionFade()
 {
 	if (!GetFollowCamera() || !GetCapsuleComponent()) return;
 
-
+	// 1. Line Trace 위치 설정 (카메라 위치에서 캐릭터 중앙까지)
 	FVector PlayerLocation = GetActorLocation() + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.5f);
 	FVector CameraLocation = GetFollowCamera()->GetComponentLocation();
 
@@ -306,53 +309,74 @@ void ALostSectorCharacter::HandleOcclusionFade()
 		Params
 	);
 
-	TArray<AActor*> CurrentOccludingActors;
+	UE_LOG(LogTemp, Warning, TEXT("Total Hits: %d"), HitResults.Num());
 
-	// 1. 현재 트레이스에 걸린 액터들을 CurrentOccludingActors에 채우고 투명화
+	for (const FHitResult& Hit : HitResults)
+	{
+		if (Hit.GetActor())
+		{
+			// ➡️ 충돌한 모든 액터의 이름 출력
+			UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s - Component: %s"),
+				*Hit.GetActor()->GetName(),
+				*Hit.GetComponent()->GetName()
+			);
+		}
+	}
+	// 현재 프레임에서 Line Trace에 걸린 모든 액터를 저장할 집합
+	TSet<AActor*> CurrentOccludingActorsSet; // TSet을 사용하여 중복을 제거합니다.
+
+	// --- 단계 A: 현재 가리는 모든 액터를 투명화 ---
 	for (const FHitResult& Hit : HitResults)
 	{
 		AActor* HitActor = Hit.GetActor();
-		// Static/World Dynamic 액터만 처리하고 유효성 검사
 		if (HitActor && !HitActor->IsA<ACharacter>() && HitActor->GetRootComponent() && HitActor->GetRootComponent()->Mobility != EComponentMobility::Movable)
 		{
-			CurrentOccludingActors.Add(HitActor);
-
 			TArray<UPrimitiveComponent*> PrimitiveComponents;
 			HitActor->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
 
-			for (UPrimitiveComponent* Component : PrimitiveComponents)
+			if (PrimitiveComponents.Num() > 0)
 			{
-				SetActorOpacity(Component, 0.1f); // 투명화
+				// ➡️ 여기에서 한 번만 추가
+				CurrentOccludingActorsSet.Add(HitActor);
+
+				// 투명화 적용
+				for (UPrimitiveComponent* Component : PrimitiveComponents)
+				{
+					SetActorOpacity(Component, 0.1f);
+				}
 			}
 		}
 	}
 
-	// 2. 불투명으로 복구해야 하는 액터 찾기
+	// --- 단계 B: 더 이상 가려지지 않는 액터 복구 ---
+	// ActorsToRestoreOpacity (이전에 투명했던 액터)를 순회하며 복구 대상을 찾습니다.
 	TArray<AActor*> ActorsToUnfade;
+
+	// TArray인 ActorsToRestoreOpacity를 순회
 	for (AActor* ActorToRestore : ActorsToRestoreOpacity)
 	{
-		// 이전에 투명했지만, 현재 프레임의 트레이스에 걸리지 않은 액터
-		if (ActorToRestore && !CurrentOccludingActors.Contains(ActorToRestore))
+		if (!ActorToRestore || !IsValid(ActorToRestore)) continue;
+		// 1. 현재 Line Trace에 잡힌 액터 목록에 없다면 (더 이상 가리지 않는다면)
+		if (!CurrentOccludingActorsSet.Contains(ActorToRestore))
 		{
 			ActorsToUnfade.Add(ActorToRestore);
+
+			// 2. 불투명 복구 로직 실행
+			TArray<UPrimitiveComponent*> PrimitiveComponents;
+			ActorToRestore->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+			for (UPrimitiveComponent* Component : PrimitiveComponents)
+			{
+				SetActorOpacity(Component, 1.0f); // 불투명 복구
+			}
 		}
 	}
-
-	// 3. 불투명 복구 로직 실행 및 ActorsToRestoreOpacity에서 제거
+	// 3. 복구 완료된 액터들을 ActorsToRestoreOpacity 목록에서 제거
 	for (AActor* ActorToUnfade : ActorsToUnfade)
 	{
-		TArray<UPrimitiveComponent*> PrimitiveComponents;
-		ActorToUnfade->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
-
-		for (UPrimitiveComponent* Component : PrimitiveComponents)
-		{
-			SetActorOpacity(Component, 1.0f); // 불투명 복구
-		}
 		ActorsToRestoreOpacity.Remove(ActorToUnfade);
 	}
-
-	// 4. 현재 투명화된 액터를 다음 프레임의 '복구 대상 목록'에 추가
-	for (AActor* CurrentActor : CurrentOccludingActors)
+	for (AActor* CurrentActor : CurrentOccludingActorsSet)
 	{
 		if (!ActorsToRestoreOpacity.Contains(CurrentActor))
 		{

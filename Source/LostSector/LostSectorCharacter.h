@@ -161,7 +161,7 @@ protected:
 	TObjectPtr<class UUserWidget> DeathWidgetInstance;
 
 	UPROPERTY()
-	TArray<AActor*> ActorsToRestoreOpacity;
+	TSet<AActor*> ActorsToRestoreOpacity;
 
 	// [추가] 투명화 처리 로직을 매 프레임 실행할 함수 선언
 	void HandleOcclusionFade();
