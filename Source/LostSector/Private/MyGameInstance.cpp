@@ -5,6 +5,11 @@
 #include "OnlineSessionSettings.h"
 #include "MainMenu.h"
 #include "PauseMenu.h"
+#include "UMultiplayerMenuWidget.h"
+#include "UServerBrowserWidget.h"
+#include "UCreateGameWidget.h"
+#include "GameFramework/PlayerController.h"
+#include "Framework/Application/SlateApplication.h"
 
 //�ʺ�ä��,�߼�ä��
 const static FName SESSION_NAME = TEXT("GameSession"); //ä�θ�
@@ -19,6 +24,18 @@ UMyGameInstance::UMyGameInstance()
 	ConstructorHelpers::FClassFinder<UUserWidget> PauseMenuBPClass(TEXT("/Game/UI/WB_PauseMenu"));
 	if (PauseMenuBPClass.Succeeded())
 		PauseMenuWidgetClass = PauseMenuBPClass.Class;
+
+	ConstructorHelpers::FClassFinder<UUserWidget> MultiplayerMenuBPClass(TEXT("/Game/Team_Folder/LHJ/UI/WB_MultiplayerMenu"));
+	if (MultiplayerMenuBPClass.Succeeded())
+		MultiplayerMenuWidgetClass = MultiplayerMenuBPClass.Class;
+
+	ConstructorHelpers::FClassFinder<UUserWidget> ServerBrowserBPClass(TEXT("/Game/Team_Folder/LHJ/UI/WB_ServerBrowser"));
+	if (ServerBrowserBPClass.Succeeded())
+		ServerBrowserWidgetClass = ServerBrowserBPClass.Class;
+
+	ConstructorHelpers::FClassFinder<UUserWidget> CreateGameBPClass(TEXT("/Game/Team_Folder/LHJ/UI/WB_CreateGame"));
+	if (CreateGameBPClass.Succeeded())
+		CreateGameWidgetClass = CreateGameBPClass.Class;
 }
 void UMyGameInstance::LoadMainMenu()
 {
@@ -40,6 +57,69 @@ void UMyGameInstance::LoadPauseMenu()
 
 	PauseMenu->SetOwningInstance(this);
 	PauseMenu->StartUp();
+}
+
+void UMyGameInstance::LoadMultiplayerMenu()
+{
+	if (!ensure(MultiplayerMenuWidgetClass)) return;
+
+	MultiplayerMenu = CreateWidget<UMultiplayerMenuWidget>(this, MultiplayerMenuWidgetClass);
+	if (!MultiplayerMenu) return;
+
+	MultiplayerMenu->SetOwningInstance(this);
+	MultiplayerMenu->StartUp();
+}
+
+void UMyGameInstance::LoadServerBrowser()
+{
+	if (!ensure(ServerBrowserWidgetClass)) return;
+
+	ServerBrowser = CreateWidget<UServerBrowserWidget>(this, ServerBrowserWidgetClass);
+	if (!ServerBrowser) return;
+
+	ServerBrowser->SetOwningGameInstance(this);
+	ServerBrowser->AddToViewport(10);
+	
+	// Input mode 설정
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetWidgetToFocus(ServerBrowser->TakeWidget());
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PC->SetInputMode(InputMode);
+			PC->bShowMouseCursor = true;
+		}
+	}
+	
+	RefreshServerList(); // Automatically refresh when opening server browser
+}
+
+void UMyGameInstance::LoadCreateGameMenu()
+{
+	if (!ensure(CreateGameWidgetClass)) return;
+
+	CreateGameMenu = CreateWidget<UUCreateGameWidget>(this, CreateGameWidgetClass);
+	if (!CreateGameMenu) return;
+
+	CreateGameMenu->SetOwningInstance(this);
+	CreateGameMenu->AddToViewport(10);
+	
+	// Input mode 설정
+	UWorld* World = GetWorld();
+	if (World)
+	{
+		if (APlayerController* PC = World->GetFirstPlayerController())
+		{
+			FInputModeUIOnly InputMode;
+			InputMode.SetWidgetToFocus(CreateGameMenu->TakeWidget());
+			InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+			PC->SetInputMode(InputMode);
+			PC->bShowMouseCursor = true;
+		}
+	}
 }
 
 
@@ -83,9 +163,12 @@ void UMyGameInstance::Init()
 
 
 
-void UMyGameInstance::Host(FString ServerName)
+void UMyGameInstance::Host(FString ServerName, int32 MaxPlayers, bool bIsLan)
 {
 	DesiredServerName = ServerName;
+	DesiredMaxPlayers = MaxPlayers;
+	DesiredbIsLan = bIsLan;
+	
 	if (SessionInterface.IsValid())
 	{
 		auto AlreadyExsistingSession = SessionInterface->GetNamedSession(SESSION_NAME);
@@ -97,24 +180,25 @@ void UMyGameInstance::Host(FString ServerName)
 		}
 		else
 		{
-			CreateSession();
+			CreateSession(MaxPlayers, bIsLan);
 		}
 	}
 }
-void UMyGameInstance::CreateSession()
+void UMyGameInstance::CreateSession(int32 MaxPlayers, bool bIsLan)
 {
 	if (SessionInterface.IsValid())
 	{
 		FOnlineSessionSettings SessionSettings;
 
-		if (IOnlineSubsystem::Get()->GetSubsystemName() == "NULL")
+		// LAN 설정 (파라미터 우선, 없으면 NULL subsystem 체크)
+		if (bIsLan || IOnlineSubsystem::Get()->GetSubsystemName() == "NULL")
 			SessionSettings.bIsLANMatch = true;
 		else
 			SessionSettings.bIsLANMatch = false;
 
 
 		// P2P 멀티플레이어를 위한 세션 설정
-		SessionSettings.NumPublicConnections = 24;
+		SessionSettings.NumPublicConnections = MaxPlayers;
 		SessionSettings.bUsesPresence = true;
 		SessionSettings.bShouldAdvertise = true;
 		SessionSettings.bAllowInvites = true; // P2P 초대 허용
@@ -200,7 +284,7 @@ void UMyGameInstance::StartSession()
 void UMyGameInstance::OnDestroySessionComplate(FName InSessionName, bool IsSuccess)
 {
 	if (IsSuccess == true)
-		CreateSession();
+		CreateSession(DesiredMaxPlayers, DesiredbIsLan);
 }
 
 void UMyGameInstance::OnFindSessionComplate(bool IsSuccess)
@@ -228,7 +312,20 @@ void UMyGameInstance::OnFindSessionComplate(bool IsSuccess)
 			ServerNames.Add(ServerData);
 		}
 
-		MainMenu->SetServerList(ServerNames);
+		// 기존 MainMenu에 서버 목록 전달
+		if (MainMenu)
+		{
+			MainMenu->SetServerList(ServerNames);
+		}
+
+		// 새로운 MultiplayerMenu의 ServerBrowser에도 서버 목록 전달
+		if (MultiplayerMenu)
+		{
+			if (UServerBrowserWidget* BrowserWidget  = MultiplayerMenu->GetServerBrowserWidget())
+			{
+				BrowserWidget->SetServerList(ServerNames);
+			}
+		}
 
 		UE_LOG(LogTemp, Warning, TEXT("Finished Finding Session"));
 
@@ -401,4 +498,23 @@ void UMyGameInstance::TestRefresh()
 {
 	UE_LOG(LogTemp, Warning, TEXT("TestRefresh: Refreshing server list..."));
 	RefreshServerList();
+}
+
+// UI 테스트용 콘솔 명령어
+void UMyGameInstance::TestOpenMultiplayerMenu()
+{
+	UE_LOG(LogTemp, Warning, TEXT("TestOpenMultiplayerMenu: Opening multiplayer menu..."));
+	LoadMultiplayerMenu();
+}
+
+void UMyGameInstance::TestOpenServerBrowser()
+{
+	UE_LOG(LogTemp, Warning, TEXT("TestOpenServerBrowser: Opening server browser..."));
+	LoadServerBrowser();
+}
+
+void UMyGameInstance::TestOpenCreateGame()
+{
+	UE_LOG(LogTemp, Warning, TEXT("TestOpenCreateGame: Opening create game menu..."));
+	LoadCreateGameMenu();
 }

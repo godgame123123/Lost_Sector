@@ -20,7 +20,7 @@ class IMyInterface
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
-	virtual void Host(FString ServerName)PURE;
+	virtual void Host(FString ServerName, int32 MaxPlayers = 3, bool bIsLan = false) PURE;
 	virtual void Join(uint32 Index) PURE;
 	virtual void RefreshServerList()PURE;
 	virtual void OpenMainMenuLevel()PURE;

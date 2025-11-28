@@ -43,11 +43,11 @@ protected:
 
 	// 2명일 때 게임 시작 전 대기 시간 (초) - 추가 인원이 없으면 이 시간 후 시작
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby Settings", meta = (ClampMin = "0", ClampMax = "600"))
-	float StartDelayWith2Players = 180.0f; // 3분 = 180초
+	float StartDelayWith2Players = 30.0f; // 30초
 
 	// 3명일 때 게임 시작 전 대기 시간 (초) - 최대 인원이면 이 시간 후 시작
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Lobby Settings", meta = (ClampMin = "0", ClampMax = "60"))
-	float StartDelayWithMaxPlayers = 5.0f; // 5초
+	float StartDelayWithMaxPlayers = 0.0f; // 즉시 시작
 
 	// 게임 맵으로 이동
 	UFUNCTION()
