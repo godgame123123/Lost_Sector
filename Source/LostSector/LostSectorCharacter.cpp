@@ -286,70 +286,79 @@ void ALostSectorCharacter::SetActorOpacity(UPrimitiveComponent* MeshComp, float 
 }
 void ALostSectorCharacter::HandleOcclusionFade()
 {
-	if (!CameraBoom) return; // CameraBoom이 없다면 종료
+	if (!GetFollowCamera() || !GetCapsuleComponent()) return;
 
-	FVector PlayerLocation = GetActorLocation();
-	FVector CameraLocation = CameraBoom->GetComponentLocation();
 
-	// Line Trace 설정
+	FVector PlayerLocation = GetActorLocation() + FVector(0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 0.5f);
+	FVector CameraLocation = GetFollowCamera()->GetComponentLocation();
+
 	TArray<FHitResult> HitResults;
 	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this); // 캐릭터 자신 무시
+	Params.AddIgnoredActor(this);
 	Params.bReturnPhysicalMaterial = false;
 
 	// Line Trace 실행 (카메라에서 플레이어까지)
-	bool bHit = GetWorld()->LineTraceMultiByChannel(
+	GetWorld()->LineTraceMultiByChannel(
 		HitResults,
 		CameraLocation,
 		PlayerLocation,
-		ECollisionChannel::ECC_Visibility, // Visibility 채널을 사용
+		ECollisionChannel::ECC_Visibility,
 		Params
 	);
 
 	TArray<AActor*> CurrentOccludingActors;
 
-	// 1. 현재 트레이스에 걸린 액터 투명화
+	// 1. 현재 트레이스에 걸린 액터들을 CurrentOccludingActors에 채우고 투명화
 	for (const FHitResult& Hit : HitResults)
 	{
 		AActor* HitActor = Hit.GetActor();
-		// Static/World Dynamic 액터만 처리합니다. (플레이어나 무기 같은 액터는 제외)
-		if (HitActor && !HitActor->IsA<ACharacter>() && HitActor->GetRootComponent() && HitActor->GetRootComponent()->Mobility == EComponentMobility::Static)
+		// Static/World Dynamic 액터만 처리하고 유효성 검사
+		if (HitActor && !HitActor->IsA<ACharacter>() && HitActor->GetRootComponent() && HitActor->GetRootComponent()->Mobility != EComponentMobility::Movable)
 		{
 			CurrentOccludingActors.Add(HitActor);
 
-			// 2. 액터의 모든 Primitive Component를 투명화 처리
 			TArray<UPrimitiveComponent*> PrimitiveComponents;
 			HitActor->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
 
 			for (UPrimitiveComponent* Component : PrimitiveComponents)
 			{
-				// Opacity 0.3으로 설정 (반투명)
-				SetActorOpacity(Component, 0.3f);
+				SetActorOpacity(Component, 0.1f); // 투명화
 			}
-
-			// 복구 목록에서 제거 (현재 투명 상태를 유지해야 함)
-			ActorsToRestoreOpacity.Remove(HitActor);
 		}
 	}
 
-	// 3. 이전 프레임에 투명화되었으나 현재는 걸리지 않은 액터 불투명으로 복구
+	// 2. 불투명으로 복구해야 하는 액터 찾기
+	TArray<AActor*> ActorsToUnfade;
 	for (AActor* ActorToRestore : ActorsToRestoreOpacity)
 	{
-		if (ActorToRestore)
+		// 이전에 투명했지만, 현재 프레임의 트레이스에 걸리지 않은 액터
+		if (ActorToRestore && !CurrentOccludingActors.Contains(ActorToRestore))
 		{
-			TArray<UPrimitiveComponent*> PrimitiveComponents;
-			ActorToRestore->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
-
-			for (UPrimitiveComponent* Component : PrimitiveComponents)
-			{
-				// Opacity 1.0으로 설정 (불투명)
-				SetActorOpacity(Component, 1.0f);
-			}
+			ActorsToUnfade.Add(ActorToRestore);
 		}
 	}
 
-	// 4. 복구 목록 갱신
-	ActorsToRestoreOpacity = CurrentOccludingActors;
+	// 3. 불투명 복구 로직 실행 및 ActorsToRestoreOpacity에서 제거
+	for (AActor* ActorToUnfade : ActorsToUnfade)
+	{
+		TArray<UPrimitiveComponent*> PrimitiveComponents;
+		ActorToUnfade->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+		for (UPrimitiveComponent* Component : PrimitiveComponents)
+		{
+			SetActorOpacity(Component, 1.0f); // 불투명 복구
+		}
+		ActorsToRestoreOpacity.Remove(ActorToUnfade);
+	}
+
+	// 4. 현재 투명화된 액터를 다음 프레임의 '복구 대상 목록'에 추가
+	for (AActor* CurrentActor : CurrentOccludingActors)
+	{
+		if (!ActorsToRestoreOpacity.Contains(CurrentActor))
+		{
+			ActorsToRestoreOpacity.Add(CurrentActor);
+		}
+	}
 }
 void ALostSectorCharacter::SetReloadingTextVisible(bool bShow)
 {
