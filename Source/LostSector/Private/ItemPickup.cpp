@@ -1,5 +1,5 @@
 ﻿#include "ItemPickup.h"
-#include "ItemDataBase.h"                       
+#include "ItemDataBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "InventoryComponent.h"
@@ -10,40 +10,32 @@ AItemPickup::AItemPickup()
 {
     bReplicates = true;
 
-    // -----------------------------
-    // Static Mesh Component (Root)
-    // -----------------------------
     StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
     SetRootComponent(StaticMeshComp);
 
-    // 🔥 핵심 개선: 전체 Mesh 충돌 감지되도록 설정
     StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     StaticMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     StaticMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-
     StaticMeshComp->SetGenerateOverlapEvents(true);
     StaticMeshComp->SetCollisionObjectType(ECC_WorldDynamic);
-
-    // 🔥 이거 켜야 SphereTrace / 라인트레이스가 "메쉬 전체"에 닿음
     StaticMeshComp->bTraceComplexOnMove = true;
     StaticMeshComp->bReturnMaterialOnMove = true;
 
-
-    // -----------------------------
-    // Skeletal Mesh Component
-    // -----------------------------
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
     SkeletalMeshComp->SetupAttachment(RootComponent);
-
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     SkeletalMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     SkeletalMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-
     SkeletalMeshComp->SetGenerateOverlapEvents(true);
     SkeletalMeshComp->bTraceComplexOnMove = true;
     SkeletalMeshComp->bReturnMaterialOnMove = true;
+}
 
-   // SkeletalMeshComp->SetVisibility(false, true);
+void AItemPickup::BeginPlay()
+{
+    Super::BeginPlay();
+    // ❌ 중복 호출 제거. OnRep_Stack이 자동으로 처리함.
+    // ApplyVisualFromData();
 }
 
 void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -55,7 +47,7 @@ void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 void AItemPickup::OnConstruction(const FTransform& Transform)
 {
     Super::OnConstruction(Transform);
-   // ApplyVisualFromData();
+    ApplyVisualFromData();
 }
 
 void AItemPickup::OnRep_Stack()
@@ -63,13 +55,18 @@ void AItemPickup::OnRep_Stack()
     ApplyVisualFromData();
 }
 
+void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+}
 
 void AItemPickup::ApplyVisualFromData()
 {
     StaticMeshComp->SetVisibility(false, true);
     SkeletalMeshComp->SetVisibility(false, true);
 
-    if (!Stack.Item) return;
+    if (!Stack.Item)
+        return;
 
     if (Stack.Item->WorldStaticMesh)
     {
@@ -89,49 +86,30 @@ void AItemPickup::ApplyVisualFromData()
     }
 }
 
-void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-    Super::PostEditChangeProperty(PropertyChangedEvent);
-    // 위치 강제 리셋 방지 (0,0,0로 튀는 현상 대응)
-}
-
 void AItemPickup::Interact(ACharacter* ByWho)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Pickup Interact (Authority=%d)"), GetLocalRole() == ROLE_Authority);
-
     if (!ByWho || GetLocalRole() != ROLE_Authority)
         return;
 
     if (!Stack.IsValid())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Stack invalid"));
         return;
-    }
 
     if (FVector::Dist(ByWho->GetActorLocation(), GetActorLocation()) > MaxUseDistance)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Too far"));
         return;
-    }
 
     if (UInventoryComponent* Inv = ByWho->FindComponentByClass<UInventoryComponent>())
     {
         int32 Added = 0;
         Inv->TryAddStack(Stack, Added);
-        UE_LOG(LogTemp, Warning, TEXT("TryAddStack Added = %d"), Added);
 
         if (Added > 0)
         {
             Stack.Count -= Added;
+
             if (Stack.Count <= 0)
             {
-                UE_LOG(LogTemp, Warning, TEXT("Destroy pickup"));
                 Destroy();
             }
         }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("No InventoryComponent on character"));
     }
 }
