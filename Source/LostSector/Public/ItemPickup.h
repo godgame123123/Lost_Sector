@@ -5,36 +5,42 @@
 #include "Interactable.h"
 #include "ItemPickup.generated.h"
 
-UCLASS(Blueprintable)
+UCLASS()
 class LOSTSECTOR_API AItemPickup : public AActor, public IInteractable
 {
     GENERATED_BODY()
+
 public:
     AItemPickup();
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_Stack, Category = "Item")
     FItemStack Stack;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+    UPROPERTY(EditAnywhere)
     float MaxUseDistance = 220.f;
 
 protected:
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     class UStaticMeshComponent* StaticMeshComp;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
     class USkeletalMeshComponent* SkeletalMeshComp;
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-    void ApplyVisualFromData();
+    virtual void OnConstruction(const FTransform& Transform) override;
+    virtual void BeginPlay() override;
 
     UFUNCTION()
     void OnRep_Stack();
 
-    virtual void OnConstruction(const FTransform& Transform) override;
+    void ApplyVisualFromData();
 
 public:
+
+    // 🔥 위치 튀는 버그 해결
+    virtual void PostEditMove(bool bFinished) override {}
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
     virtual void Interact(class ACharacter* ByWho) override;
