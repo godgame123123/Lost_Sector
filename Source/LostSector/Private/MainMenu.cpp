@@ -8,35 +8,19 @@
 #include "Components/TextBlock.h"
 #include "ServerRow.h"
 #include "MyGameInstance.h"
+#include "MyInterface.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Framework/Text/TextLayout.h"
 
 UMainMenu::UMainMenu()
 {
-	// WB_ServerRow 위젯 클래스 찾기
-	ConstructorHelpers::FClassFinder<UUserWidget> ServerRowClass_Asset(TEXT("/Game/Team_Folder/GimanLee/WB_ServerRow"));
-	if (ServerRowClass_Asset.Succeeded())
-	{
-		ServerRowClass = ServerRowClass_Asset.Class;
-		UE_LOG(LogTemp, Log, TEXT("[MainMenu] Constructor: WB_ServerRow 클래스 로드 성공"));
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[MainMenu] Constructor: WB_ServerRow 클래스를 찾을 수 없습니다! 경로: /Game/Team_Folder/GimanLee/WB_ServerRow"));
-		// 대체 경로 시도
-		ConstructorHelpers::FClassFinder<UUserWidget> ServerRowClass_Asset2(TEXT("/Game/UI/WB_ServerRow"));
-		if (ServerRowClass_Asset2.Succeeded())
-		{
-			ServerRowClass = ServerRowClass_Asset2.Class;
-			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Constructor: 대체 경로(/Game/UI/WB_ServerRow)에서 WB_ServerRow 클래스 로드 성공"));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("[MainMenu] Constructor: 모든 경로에서 WB_ServerRow 클래스를 찾을 수 없습니다!"));
-		}
-	}
-
-		//Init() ;
+	// 모든 위젯 클래스들은 런타임에 동적으로 로드하도록 변경 (패킹 에러 방지)
+	// ConstructorHelpers::FClassFinder는 CDO 생성 시점에 에셋을 찾으려고 시도하므로
+	// 패킹 과정에서 에셋이 없거나 경로가 잘못되면 실패합니다.
+	// 따라서 ServerRowClass는 SetServerList()에서 동적으로 로드됩니다.
 }
+
+
 
 void UMainMenu::NativeConstruct()
 {
@@ -44,50 +28,68 @@ void UMainMenu::NativeConstruct()
 	
 	UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: 위젯 생성 완료, 버튼 바인딩 재시도"));
 	
-	// NativeConstruct에서도 버튼 바인딩 재시도 (Initialize가 너무 일찍 호출될 수 있음)
-	if (HostButton != nullptr)
+	// OwningInstance가 설정되지 않았으면 자동으로 설정
+	if (!OwningInstance.GetInterface())
 	{
-		// 버튼 상태 확인
-		bool bButtonEnabled = HostButton->GetIsEnabled();
-		ESlateVisibility ButtonVisibility = HostButton->GetVisibility();
-		bool bIsVisible = HostButton->IsVisible();
-		
-		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: HostButton 상태 - Enabled: %d, Visibility: %d, IsVisible: %d"), 
-			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility, bIsVisible ? 1 : 0);
-		
-		// 바인딩 전 상태 확인
-		int32 BeforeCount = HostButton->OnPressed.GetAllObjects().Num();
-		HostButton->OnPressed.AddDynamic(this, &UMainMenu::OpenHostMenu);
-		int32 AfterCount = HostButton->OnPressed.GetAllObjects().Num();
-		
-		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: HostButton 바인딩 완료 (바인딩 전: %d, 바인딩 후: %d)"), BeforeCount, AfterCount);
+		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: OwningInstance가 null입니다. 자동으로 설정 시도..."));
+		if (UWorld* World = GetWorld())
+		{
+			UGameInstance* GameInstance = World->GetGameInstance();
+			if (GameInstance)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: GameInstance 클래스 이름: %s"), *GameInstance->GetClass()->GetName());
+				
+				if (UMyGameInstance* MyGameInstance = Cast<UMyGameInstance>(GameInstance))
+				{
+					SetOwningInstance(TScriptInterface<IMyInterface>(MyGameInstance));
+					UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: OwningInstance 자동 설정 완료"));
+				}
+				else
+				{
+					// GameInstance가 UMyGameInstance가 아닌 경우, IMyInterface를 구현하는지 확인
+					// UObject에서 인터페이스 구현 여부 확인
+					if (GameInstance->GetClass()->ImplementsInterface(UMyInterface::StaticClass()))
+					{
+						// TScriptInterface 생성 - UObject를 직접 전달
+						TScriptInterface<IMyInterface> InterfaceScript(GameInstance);
+						
+						if (InterfaceScript.GetInterface())
+						{
+							SetOwningInstance(InterfaceScript);
+							UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: IMyInterface로 OwningInstance 설정 완료"));
+						}
+						else
+						{
+							UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: GameInstance가 IMyInterface를 구현하지만 캐스팅 실패!"));
+							UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: GameInstance 클래스: %s"), *GameInstance->GetClass()->GetName());
+						}
+					}
+					else
+					{
+						UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: GameInstance가 IMyInterface를 구현하지 않습니다!"));
+						UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: GameInstance 클래스: %s"), *GameInstance->GetClass()->GetName());
+						UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: 프로젝트 설정에서 GameInstance 클래스를 UMyGameInstance로 변경하세요!"));
+						UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: 또는 Blueprint에서 MainMenu 생성 시 SetOwningInstance를 호출하세요!"));
+					}
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: GameInstance가 null입니다!"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: World를 가져올 수 없습니다!"));
+		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: HostButton이 null입니다! Blueprint에서 버튼 이름이 'HostButton'인지 확인하세요."));
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: OwningInstance가 이미 설정되어 있습니다."));
 	}
 	
-	if (JoinButton != nullptr)
-	{
-		// 버튼 상태 확인
-		bool bButtonEnabled = JoinButton->GetIsEnabled();
-		ESlateVisibility ButtonVisibility = JoinButton->GetVisibility();
-		bool bIsVisible = JoinButton->IsVisible();
-		
-		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: JoinButton 상태 - Enabled: %d, Visibility: %d, IsVisible: %d"), 
-			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility, bIsVisible ? 1 : 0);
-		
-		// 바인딩 전 상태 확인
-		int32 BeforeCount = JoinButton->OnPressed.GetAllObjects().Num();
-		JoinButton->OnPressed.AddDynamic(this, &UMainMenu::OpenJoinMenu);
-		int32 AfterCount = JoinButton->OnPressed.GetAllObjects().Num();
-		
-		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: JoinButton 바인딩 완료 (바인딩 전: %d, 바인딩 후: %d)"), BeforeCount, AfterCount);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("[MainMenu] NativeConstruct: JoinButton이 null입니다! Blueprint에서 버튼 이름이 'JoinButton'인지 확인하세요."));
-	}
+	// NativeConstruct에서는 버튼 바인딩을 하지 않습니다 (Initialize에서 이미 바인딩됨)
+	// 중복 바인딩을 방지하기 위해 제거
 }
 
 bool UMainMenu::Initialize()
@@ -218,6 +220,18 @@ bool UMainMenu::Initialize()
 		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: ConfirmHostButton이 null입니다!"));
 	}
 
+	// ServerHostName 텍스트 변경 이벤트 바인딩
+	if (ServerHostName != nullptr)
+	{
+		ServerHostName->OnTextCommitted.AddDynamic(this, &UMainMenu::OnServerHostNameTextCommitted);
+		ServerHostName->OnTextChanged.AddDynamic(this, &UMainMenu::OnServerHostNameTextChanged);
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] Initialize: ServerHostName 텍스트 이벤트 바인딩 완료"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: ServerHostName이 null입니다!"));
+	}
+
 	if (QuitButton != nullptr)
 	{
 		QuitButton->OnPressed.AddDynamic(this, &UMainMenu::QuitGame);
@@ -289,26 +303,26 @@ void UMainMenu::JoinServer()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[MainMenu] JoinServer 버튼 클릭됨"));
 
-	if (SelectedIndex.IsSet() && OwningInstance)
+	if (bHasSelectedIndex && OwningInstance.GetInterface())
 	{
-		UE_LOG(LogTemp, Log, TEXT("[MainMenu] JoinServer: 선택된 서버 인덱스 = %d"), SelectedIndex.GetValue());
-		OwningInstance->Join(SelectedIndex.GetValue());
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] JoinServer: 선택된 서버 인덱스 = %d"), SelectedIndex);
+		OwningInstance.GetInterface()->Join(SelectedIndex);
 		UE_LOG(LogTemp, Log, TEXT("[MainMenu] JoinServer: 서버 조인 요청 완료"));
 	}
 	else
 	{
-		if (!SelectedIndex.IsSet())
+		if (!bHasSelectedIndex)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] JoinServer: 서버가 선택되지 않았습니다!"));
 		}
-		if (!OwningInstance)
+		if (!OwningInstance.GetInterface())
 		{
 			UE_LOG(LogTemp, Error, TEXT("[MainMenu] JoinServer: OwningInstance가 null입니다!"));
 		}
 	}
 }
 
-void UMainMenu::SetSelectedIndex(uint32 InIndex)
+void UMainMenu::SetSelectedIndex(int32 InIndex)
 {
 	UE_LOG(LogTemp, Log, TEXT("[MainMenu] SetSelectedIndex: 인덱스 %d 선택됨"), InIndex);
 	
@@ -318,6 +332,7 @@ void UMainMenu::SetSelectedIndex(uint32 InIndex)
 		return;
 	}
 	
+	bHasSelectedIndex = true;
 	SelectedIndex = InIndex;
 	int32 SelectedCount = 0;
 	for (int32 i = 0; i < Serverlist->GetChildrenCount(); ++i)
@@ -327,8 +342,8 @@ void UMainMenu::SetSelectedIndex(uint32 InIndex)
 		{
 			bool bWasSelected = serverRow->bSelected;
 			serverRow->bSelected = 
-				(SelectedIndex.IsSet() && 
-					SelectedIndex.GetValue() == i);
+				(bHasSelectedIndex && 
+					SelectedIndex == i);
 			
 			if (serverRow->bSelected)
 			{
@@ -357,17 +372,37 @@ void UMainMenu::SetServerList(
 		return;
 	}
 
+	// ServerRowClass가 null이면 동적으로 로드 시도
 	if (!ServerRowClass)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[MainMenu] SetServerList: ServerRowClass가 null입니다! WB_ServerRow 위젯을 찾을 수 없습니다."));
-		return;
+		// 여러 경로 시도 (Blueprint 클래스는 _C 접미사 필요)
+		static const TArray<FString> ServerRowPaths = {
+			TEXT("/Game/Team_Folder/GimanLee/WB_ServerRow.WB_ServerRow_C"),
+			TEXT("/Game/UI/WB_ServerRow.WB_ServerRow_C")
+		};
+
+		for (const FString& Path : ServerRowPaths)
+		{
+			if (UClass* FoundClass = LoadClass<UUserWidget>(nullptr, *Path))
+			{
+				ServerRowClass = FoundClass;
+				UE_LOG(LogTemp, Log, TEXT("[MainMenu] SetServerList: WB_ServerRow 클래스 동적 로드 성공 (경로: %s)"), *Path);
+				break;
+			}
+		}
+
+		if (!ServerRowClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[MainMenu] SetServerList: WB_ServerRow Blueprint를 찾을 수 없습니다. 서버 목록을 표시할 수 없습니다."));
+			return;
+		}
 	}
 
 	Serverlist->ClearChildren();
 	UE_LOG(LogTemp, Log, TEXT("[MainMenu] SetServerList: 기존 서버 목록 초기화 완료"));
 
-	uint32 i = 0;
-	uint32 SuccessCount = 0;
+	int32 i = 0;
+	int32 SuccessCount = 0;
 	for (const FServerData& ServerData : InServerData)
 	{
 		UServerRow* ServerRow = CreateWidget<UServerRow>(World, ServerRowClass);
@@ -470,10 +505,16 @@ void UMainMenu::OpenJoinMenu()
 	MenuSwitcher->SetActiveWidget(JoinMenu);
 	UE_LOG(LogTemp, Log, TEXT("[MainMenu] OpenJoinMenu: 조인 메뉴로 전환 완료"));
 
-	if (OwningInstance)
+	if (OwningInstance.GetInterface())
 	{
 		UE_LOG(LogTemp, Log, TEXT("[MainMenu] OpenJoinMenu: 서버 목록 새로고침 시작"));
-		OwningInstance->RefreshServerList();
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] OpenJoinMenu: Serverlist 위젯 상태 확인 - null 여부: %d"), Serverlist ? 0 : 1);
+		if (Serverlist)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[MainMenu] OpenJoinMenu: Serverlist 위젯 유효 - 자식 수: %d"), Serverlist->GetChildrenCount());
+		}
+		OwningInstance.GetInterface()->RefreshServerList();
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] OpenJoinMenu: RefreshServerList 호출 완료"));
 	}
 	else
 	{
@@ -485,25 +526,70 @@ void UMainMenu::HostServer()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[MainMenu] HostServer 버튼 클릭됨"));
 	
+	// 디버깅: OwningInstance 상태 확인
+	if (OwningInstance.GetInterface())
+	{
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: OwningInstance 유효 - 인터페이스 포인터: %p"), OwningInstance.GetInterface());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[MainMenu] HostServer: OwningInstance가 null입니다!"));
+		UE_LOG(LogTemp, Error, TEXT("[MainMenu] HostServer: SetOwningInstance가 호출되지 않았거나 실패했습니다."));
+		UE_LOG(LogTemp, Error, TEXT("[MainMenu] HostServer: LoadMainMenu()가 호출되었는지 확인하세요."));
+		return;
+	}
+	
 	if (!ServerHostName)
 	{
 		UE_LOG(LogTemp, Error, TEXT("[MainMenu] HostServer: ServerHostName이 null입니다!"));
 		return;
 	}
-	if (!OwningInstance)
-	{
-		UE_LOG(LogTemp, Error, TEXT("[MainMenu] HostServer: OwningInstance가 null입니다!"));
-		return;
-	}
 
-	FString ServerName = ServerHostName->GetText().ToString();
+	// 서버 이름 가져오기 - 캐시된 값 또는 현재 텍스트
+	FString ServerName;
+	
+	if (!CachedServerName.IsEmpty())
+	{
+		ServerName = CachedServerName;
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: 캐시된 서버 이름 사용: '%s'"), *ServerName);
+	}
+	else
+	{
+		// 캐시된 값이 없으면 현재 텍스트 가져오기
+		FText TextValue = ServerHostName->GetText();
+		ServerName = TextValue.ToString();
+		
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: ServerHostName 위젯 상태 확인"));
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: TextValue.IsEmpty() = %d"), TextValue.IsEmpty() ? 1 : 0);
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: ServerName.Len() = %d"), ServerName.Len());
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: ServerName = '%s'"), *ServerName);
+	}
+	
 	if (ServerName.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] HostServer: 서버 이름이 비어있습니다!"));
+		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] HostServer: ServerHostName 위젯에 텍스트를 입력하고 Enter를 누르거나, 위젯에서 포커스를 벗어나세요!"));
 		return;
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[MainMenu] HostServer: 서버 호스팅 시작 - 서버 이름: %s"), *ServerName);
-	OwningInstance->Host(ServerName);
+	OwningInstance.GetInterface()->Host(ServerName);
+}
+
+void UMainMenu::OnServerHostNameTextCommitted(const FText& Text, ETextCommit::Type CommitMethod)
+{
+	CachedServerName = Text.ToString();
+	UE_LOG(LogTemp, Log, TEXT("[MainMenu] OnServerHostNameTextCommitted: 서버 이름 저장됨 - '%s' (CommitMethod: %d)"), *CachedServerName, (int32)CommitMethod);
+}
+
+void UMainMenu::OnServerHostNameTextChanged(const FText& Text)
+{
+	// 실시간으로 텍스트 변경 추적 (선택사항)
+	FString NewText = Text.ToString();
+	if (!NewText.IsEmpty())
+	{
+		CachedServerName = NewText;
+		UE_LOG(LogTemp, VeryVerbose, TEXT("[MainMenu] OnServerHostNameTextChanged: 텍스트 변경됨 - '%s'"), *CachedServerName);
+	}
 }
 
