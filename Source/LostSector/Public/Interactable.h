@@ -15,7 +15,6 @@ class LOSTSECTOR_API IInteractable
 
 public:
 
-    // 블루프린트 + C++ 둘 다 구현 가능
     UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
-    void Interact(class ACharacter* ByWho);
+    void Interact(ACharacter* ByWho);
 };

@@ -86,7 +86,7 @@ void AItemPickup::ApplyVisualFromData()
     }
 }
 
-void AItemPickup::Interact(ACharacter* ByWho)
+void AItemPickup::Interact_Implementation(ACharacter* ByWho)
 {
     if (!ByWho || GetLocalRole() != ROLE_Authority)
         return;
