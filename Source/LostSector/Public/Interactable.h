@@ -12,6 +12,9 @@ class LOSTSECTOR_API UInteractable : public UInterface
 class LOSTSECTOR_API IInteractable
 {
     GENERATED_BODY()
+
 public:
-    virtual void Interact(class ACharacter* ByWho) = 0;
+
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+    void Interact(ACharacter* ByWho);
 };

@@ -24,7 +24,7 @@ void ALootContainer::Unlock(AController* By)
     if (LockedBy.IsValid() && LockedBy.Get() == By) { bLocked = false; LockedBy.Reset(); }
 }
 
-void ALootContainer::Interact(ACharacter* ByWho)
+void ALootContainer::Interact_Implementation(ACharacter* ByWho)
 {
     if (!ByWho || GetLocalRole() != ROLE_Authority) return;
     if (FVector::Dist(ByWho->GetActorLocation(), GetActorLocation()) > MaxUseDistance) return;

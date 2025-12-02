@@ -169,4 +169,7 @@ public:
 	// 재장전 텍스트 위젯의 표시 여부를 제어하는 공용 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SetReloadingTextVisible(bool bShow); // 함수명 변경 (ShowReloadingText 대신 SetReloadingTextVisible 사용)
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Look")
+	float HeadPitch = 0.0f; // ⬅️ 이 변수를 추가합니다.
 };
