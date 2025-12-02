@@ -12,7 +12,9 @@ class UMainMenu : public UMenuBase
 public:
 	UMainMenu();
 protected:
+	virtual void NativeConstruct() override;
 	virtual bool Initialize() override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 private:
 
 
@@ -23,10 +25,10 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	class UButton* HostButton;
 	UPROPERTY(meta = (BindWidget))
-	class UButton* JoinButton;//Á¶ÀÎ ¸Þ´º¿ÀÇÂ
+	class UButton* JoinButton;//ï¿½ï¿½ï¿½ï¿½ ï¿½Þ´ï¿½ï¿½ï¿½ï¿½ï¿½
 
 	UPROPERTY(meta = (BindWidget))
-	class UButton* ConfirmJoinButton;//ÇØ´ç ¹æ¿¡ Á¶ÀÎÇÏ´Â°Å
+	class UButton* ConfirmJoinButton;//ï¿½Ø´ï¿½ ï¿½æ¿¡ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´Â°ï¿½
 
 
 	UPROPERTY(meta = (BindWidget))
@@ -64,21 +66,21 @@ public:
 		TArray<FServerData> InServerData);
 
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void OpenMainMenu();
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void OpenHostMenu();
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void OpenJoinMenu();
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void HostServer();
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void QuitGame();
 
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable)
 	void JoinServer();
 
 	void SetSelectedIndex(uint32 InIndex);
