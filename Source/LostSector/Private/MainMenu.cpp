@@ -48,12 +48,12 @@ void UMainMenu::NativeConstruct()
 	if (HostButton != nullptr)
 	{
 		// 버튼 상태 확인
-		bool bIsEnabled = HostButton->GetIsEnabled();
-		ESlateVisibility Visibility = HostButton->GetVisibility();
+		bool bButtonEnabled = HostButton->GetIsEnabled();
+		ESlateVisibility ButtonVisibility = HostButton->GetVisibility();
 		bool bIsVisible = HostButton->IsVisible();
 		
 		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: HostButton 상태 - Enabled: %d, Visibility: %d, IsVisible: %d"), 
-			bIsEnabled ? 1 : 0, (int32)Visibility, bIsVisible ? 1 : 0);
+			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility, bIsVisible ? 1 : 0);
 		
 		// 바인딩 전 상태 확인
 		int32 BeforeCount = HostButton->OnPressed.GetAllObjects().Num();
@@ -70,12 +70,12 @@ void UMainMenu::NativeConstruct()
 	if (JoinButton != nullptr)
 	{
 		// 버튼 상태 확인
-		bool bIsEnabled = JoinButton->GetIsEnabled();
-		ESlateVisibility Visibility = JoinButton->GetVisibility();
+		bool bButtonEnabled = JoinButton->GetIsEnabled();
+		ESlateVisibility ButtonVisibility = JoinButton->GetVisibility();
 		bool bIsVisible = JoinButton->IsVisible();
 		
 		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] NativeConstruct: JoinButton 상태 - Enabled: %d, Visibility: %d, IsVisible: %d"), 
-			bIsEnabled ? 1 : 0, (int32)Visibility, bIsVisible ? 1 : 0);
+			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility, bIsVisible ? 1 : 0);
 		
 		// 바인딩 전 상태 확인
 		int32 BeforeCount = JoinButton->OnPressed.GetAllObjects().Num();
@@ -111,20 +111,20 @@ bool UMainMenu::Initialize()
 	if (HostButton != nullptr)
 	{
 		// 버튼 상태 확인
-		bool bIsEnabled = HostButton->GetIsEnabled();
-		ESlateVisibility Visibility = HostButton->GetVisibility();
+		bool bButtonEnabled = HostButton->GetIsEnabled();
+		ESlateVisibility ButtonVisibility = HostButton->GetVisibility();
 		UE_LOG(LogTemp, Log, TEXT("[MainMenu] Initialize: HostButton 상태 - Enabled: %d, Visibility: %d"), 
-			bIsEnabled ? 1 : 0, (int32)Visibility);
+			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility);
 		
 		// 버튼이 활성화되어 있지 않으면 활성화
-		if (!bIsEnabled)
+		if (!bButtonEnabled)
 		{
 			HostButton->SetIsEnabled(true);
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: HostButton이 비활성화되어 있었습니다. 활성화했습니다."));
 		}
 		
 		// 버튼이 보이지 않으면 보이게 설정
-		if (Visibility != ESlateVisibility::Visible)
+		if (ButtonVisibility != ESlateVisibility::Visible)
 		{
 			HostButton->SetVisibility(ESlateVisibility::Visible);
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: HostButton이 보이지 않았습니다. 보이게 설정했습니다."));
@@ -158,20 +158,20 @@ bool UMainMenu::Initialize()
 	if (JoinButton != nullptr)
 	{
 		// 버튼 상태 확인
-		bool bIsEnabled = JoinButton->GetIsEnabled();
-		ESlateVisibility Visibility = JoinButton->GetVisibility();
+		bool bButtonEnabled = JoinButton->GetIsEnabled();
+		ESlateVisibility ButtonVisibility = JoinButton->GetVisibility();
 		UE_LOG(LogTemp, Log, TEXT("[MainMenu] Initialize: JoinButton 상태 - Enabled: %d, Visibility: %d"), 
-			bIsEnabled ? 1 : 0, (int32)Visibility);
+			bButtonEnabled ? 1 : 0, (int32)ButtonVisibility);
 		
 		// 버튼이 활성화되어 있지 않으면 활성화
-		if (!bIsEnabled)
+		if (!bButtonEnabled)
 		{
 			JoinButton->SetIsEnabled(true);
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: JoinButton이 비활성화되어 있었습니다. 활성화했습니다."));
 		}
 		
 		// 버튼이 보이지 않으면 보이게 설정
-		if (Visibility != ESlateVisibility::Visible)
+		if (ButtonVisibility != ESlateVisibility::Visible)
 		{
 			JoinButton->SetVisibility(ESlateVisibility::Visible);
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: JoinButton이 보이지 않았습니다. 보이게 설정했습니다."));
@@ -247,7 +247,7 @@ bool UMainMenu::Initialize()
 		APlayerController* PC = World->GetFirstPlayerController();
 		if (PC)
 		{
-			FInputModeDataBase* InputMode = PC->GetInputMode();
+			// GetInputMode()는 존재하지 않으므로 제거하고 마우스 커서 상태만 확인
 			UE_LOG(LogTemp, Warning, TEXT("[MainMenu] Initialize: InputMode 확인 - MouseCursor: %d"), PC->bShowMouseCursor ? 1 : 0);
 		}
 	}
@@ -496,7 +496,7 @@ void UMainMenu::HostServer()
 		return;
 	}
 
-	FString ServerName = ServerHostName->Text.ToString();
+	FString ServerName = ServerHostName->GetText().ToString();
 	if (ServerName.IsEmpty())
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[MainMenu] HostServer: 서버 이름이 비어있습니다!"));
