@@ -190,6 +190,54 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 	if (IsPlayerControlled() && !bIsDead) // 플레이어 제어 중, 살아있을 때만 실행
 	{
 		HandleOcclusionFade();
+
+		APlayerController* PC = Cast<APlayerController>(GetController());
+		if (PC && GetMesh())
+		{
+			FHitResult HitResult;
+			FVector MouseWorldLocation, MouseWorldDirection;
+
+			// 1. 마우스 커서를 월드 광선(Ray)으로 변환
+			if (PC->DeprojectMousePositionToWorld(MouseWorldLocation, MouseWorldDirection))
+			{
+				// 2. 광선이 월드 표면에 닿는 지점을 찾기 (Line Trace)
+				FVector TraceStart = MouseWorldLocation;
+				FVector TraceEnd = MouseWorldLocation + (MouseWorldDirection * 20000.0f); // 충분히 긴 길이 설정
+
+				FCollisionQueryParams Params;
+				Params.bReturnPhysicalMaterial = false;
+				Params.AddIgnoredActor(this); // 캐릭터는 무시
+
+				// ECC_Visibility 채널을 사용하거나 (Occlusion처럼) ECC_WorldStatic을 사용합니다.
+				if (GetWorld()->LineTraceSingleByChannel(HitResult, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility, Params))
+				{
+					FVector TargetLocation = HitResult.Location;
+
+					// 3. 캐릭터의 머리 위치 (스켈레탈 메시의 "head" 소켓 사용)
+					// "head" 소켓이 없다면 "neck_01" 등 가장 가까운 본을 사용해야 합니다.
+					FVector HeadLocation = GetMesh()->GetSocketLocation(FName("head"));
+
+					// 4. 타겟 벡터 계산 (머리 -> 마우스 타겟)
+					FVector TargetVector = TargetLocation - HeadLocation;
+
+					// 5. 수평 거리와 수직 거리를 사용하여 Pitch 각도 계산
+
+					// 수평 거리 (XY 평면의 크기)
+					float DistanceXY = FVector(TargetVector.X, TargetVector.Y, 0.0f).Size();
+
+					// Pitch 각도 계산: ArcTan2(수직 차이, 수평 거리)
+					// Atan2(Y, X) 함수를 사용하여 라디안 값을 얻습니다.
+					float AngleRad = FMath::Atan2(TargetVector.Z, DistanceXY);
+
+					// 라디안을 도(Degree)로 변환
+					float AngleDeg = FMath::RadiansToDegrees(AngleRad);
+
+					// 6. 각도 제한 및 HeadPitch 변수에 저장
+					// Aim Offset이 받는 피치 각도를 보통 -45도(숙임) ~ +45도(들음) 사이로 제한합니다.
+					HeadPitch = FMath::Clamp(AngleDeg, -45.0f, 45.0f);
+				}
+			}
+		}
 	}
 	if (bIsSprinting)
 	{
