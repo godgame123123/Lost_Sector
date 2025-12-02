@@ -15,13 +15,17 @@ class LOSTSECTOR_API UItemDataBase : public UPrimaryDataAsset
     GENERATED_BODY()
 
 public:
+
+    // =====================
+    // 기본 정보
+    // =====================
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     FName ItemId;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     FText DisplayName;
 
-    // ✔ 아이콘은 이것만 유지 (중복 제거)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     UTexture2D* Icon = nullptr;
 
@@ -34,7 +38,24 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
     EItemType Type = EItemType::Junk;
 
-    // === Visual ===
+
+    // =====================
+    // 🔥 그리드 인벤토리 정보 추가 (타르코프 방식)
+    // =====================
+
+    // 아이템의 가로 칸 수 (기본 1칸)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory Grid")
+    int32 GridWidth = 1;
+
+    // 아이템의 세로 칸 수 (기본 1칸)
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory Grid")
+    int32 GridHeight = 1;
+
+
+    // =====================
+    // 월드에서 보이는 Mesh 설정
+    // =====================
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
     TSoftObjectPtr<UStaticMesh> WorldStaticMesh;
 
@@ -50,11 +71,19 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual", meta = (ClampMin = "0.001"))
     float WorldMeshScale = 1.0f;
 
-    // === Economy ===
+
+    // =====================
+    // 경제 / 가치
+    // =====================
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Economy")
     int32 Value = 0;
 
-    // === Item Effects (for consumables) ===
+
+    // =====================
+    // 소비 아이템 효과
+    // =====================
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
     float HealAmount = 0.f;
 
@@ -64,7 +93,11 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects")
     float HungerAmount = 0.f;
 
-    // 아이템이 사용 가능한지 확인
+
+    // =====================
+    // 기능 함수
+    // =====================
+
     UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Item")
     bool IsConsumable() const
     {
