@@ -12,6 +12,10 @@ class LOSTSECTOR_API UInteractable : public UInterface
 class LOSTSECTOR_API IInteractable
 {
     GENERATED_BODY()
+
 public:
-    virtual void Interact(class ACharacter* ByWho) = 0;
+
+    // 블루프린트 + C++ 둘 다 구현 가능
+    UFUNCTION(BlueprintCallable, BlueprintNativeEvent)
+    void Interact(class ACharacter* ByWho);
 };
