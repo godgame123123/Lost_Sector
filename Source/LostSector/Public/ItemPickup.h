@@ -43,5 +43,6 @@ public:
     virtual void PostEditMove(bool bFinished) override {}
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
 
-    virtual void Interact(class ACharacter* ByWho) override;
+    virtual void Interact_Implementation(ACharacter* ByWho) override;
+
 };

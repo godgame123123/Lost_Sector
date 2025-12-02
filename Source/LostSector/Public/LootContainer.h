@@ -22,7 +22,8 @@ protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 public:
-    virtual void Interact(class ACharacter* ByWho) override;
+    virtual void Interact_Implementation(ACharacter* ByWho) override;
+
 
     // 컨테이너 인벤토리를 외부 목록으로 초기화하는 함수 (가상 함수로 선언)
     virtual void InitializeLoot(const TArray<FItemStack>& InventoryToStore);
