@@ -18,6 +18,7 @@ public class LostSector : ModuleRules
 			"OnlineSubsystem",        // ✅ 기본 온라인 시스템
 			"OnlineSubsystemUtils",   // ✅ 유틸리티
 			"UMG",
+			"SlateCore",              // ✅ ETextCommit enum을 위해 필요
 			"Json", 
 			"JsonUtilities",
 			"AIModule",

@@ -15,14 +15,21 @@ class UMainMenu;
 class UPauseMenu;
 class UMultiplayerMenuWidget;
 class UServerBrowserWidget;
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FServerData
 {
 	GENERATED_BODY()
 public:
+	UPROPERTY(BlueprintReadWrite)
 	FString Name;
-	uint16 CurrentPlayers;
-	uint16 MaxPlayers;
+	
+	UPROPERTY(BlueprintReadWrite)
+	int32 CurrentPlayers = 0;
+	
+	UPROPERTY(BlueprintReadWrite)
+	int32 MaxPlayers = 0;
+	
+	UPROPERTY(BlueprintReadWrite)
 	FString HostUserName;
 };
 

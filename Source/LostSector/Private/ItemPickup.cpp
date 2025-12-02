@@ -55,11 +55,6 @@ void AItemPickup::OnRep_Stack()
     ApplyVisualFromData();
 }
 
-void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-    Super::PostEditChangeProperty(PropertyChangedEvent);
-}
-
 void AItemPickup::ApplyVisualFromData()
 {
     StaticMeshComp->SetVisibility(false, true);

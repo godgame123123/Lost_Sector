@@ -7,33 +7,43 @@
 #include "ServerRow.generated.h"
 
 
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class UServerRow : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
-	void SetUp(class UMainMenu* InParent, uint32 InIndex);
+	UFUNCTION(BlueprintCallable, Category = "Server Row")
+	void SetUp(class UMainMenu* InParent, int32 InIndex);
+
+	// 블루프린트에서도 사용할 수 있도록 이벤트 노출
+	UFUNCTION(BlueprintImplementableEvent, Category = "Server Row")
+	void OnServerRowClicked();
+
 private:
 	UFUNCTION()
 	void OnClicked();
+
 public:
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "Server Row")
 	class UTextBlock* ServerName;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "Server Row")
 	class UTextBlock* HostUser;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadWrite, meta = (BindWidget), Category = "Server Row")
 	class UTextBlock* ConnectionFraction;
-	UPROPERTY(BlueprintReadOnly)
+
+	UPROPERTY(BlueprintReadWrite, Category = "Server Row")
 	bool bSelected;
+
 private:
 	UPROPERTY(meta = (BindWidget))
 	class UButton* RowButton;
-private:
+
 	UPROPERTY()
 	class UMainMenu* Parent;
 
-	uint32 SelfIndex;
+	UPROPERTY()
+	int32 SelfIndex;
 };

@@ -5,7 +5,7 @@
 #include "Components/Button.h"
 #include "MainMenu.h"
 
-void UServerRow::SetUp(UMainMenu* InParent, uint32 InIndex)
+void UServerRow::SetUp(UMainMenu* InParent, int32 InIndex)
 {
 	Parent = InParent;
 	SelfIndex = InIndex;
@@ -26,6 +26,9 @@ void UServerRow::SetUp(UMainMenu* InParent, uint32 InIndex)
 void UServerRow::OnClicked()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[ServerRow] OnClicked: 서버 행 클릭됨 (인덱스 %d)"), SelfIndex);
+	
+	// 블루프린트 이벤트 호출
+	OnServerRowClicked();
 	
 	if (Parent)
 	{

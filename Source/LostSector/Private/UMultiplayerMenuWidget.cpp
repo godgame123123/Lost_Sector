@@ -39,7 +39,11 @@ bool UMultiplayerMenuWidget::Initialize()
 		if (UUCreateGameWidget* CreateGameWidget = Cast<UUCreateGameWidget>(WB_CreateGame))
 		{
 			// CreateGame 위젯에 MyInterface 설정
-			CreateGameWidget->SetOwningInstance(OwningInstance);
+			// TScriptInterface에서 IMyInterface*로 변환
+			if (OwningInstance.GetInterface())
+			{
+				CreateGameWidget->SetOwningInstance(OwningInstance.GetInterface());
+			}
 
 			// 백 버튼 델리게이트 연결
 			CreateGameWidget->OnBackClickedDelegate.AddDynamic(this, &UMultiplayerMenuWidget::OnCreateGameBack);

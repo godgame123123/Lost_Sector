@@ -40,9 +40,8 @@ protected:
 public:
 
     // 🔥 위치 튀는 버그 해결
-    virtual void PostEditMove(bool bFinished) override {}
-    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-
-    virtual void Interact_Implementation(ACharacter* ByWho) override;
-
+    // Unreal Engine 5.3에서는 PostEditMove와 PostEditChangeProperty가 AActor의 멤버가 아니므로 제거
+    // 대신 OnConstruction에서 처리합니다.
+    
+    virtual void Interact(class ACharacter* ByWho) override;
 };

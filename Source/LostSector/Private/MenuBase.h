@@ -4,22 +4,29 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UObject/Interface.h"
 #include "MyInterface.h"
 #include "MenuBase.generated.h"
 
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class UMenuBase : public UUserWidget
 {
 	GENERATED_BODY()
 public:
-	void SetOwningInstance(IMyInterface* InInstance);
+	UFUNCTION(BlueprintCallable, Category = "Menu")
+	void SetOwningInstance(TScriptInterface<IMyInterface> InInstance);
 
+	UFUNCTION(BlueprintCallable, Category = "Menu")
 	void StartUp();
+
+	UFUNCTION(BlueprintCallable, Category = "Menu")
 	void Shutdown();
 
 protected:
-	IMyInterface* OwningInstance;//게임인스턴스
+	UPROPERTY(BlueprintReadWrite, Category = "Menu")
+	TScriptInterface<IMyInterface> OwningInstance;
+
 };

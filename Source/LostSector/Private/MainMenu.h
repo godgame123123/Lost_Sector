@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "MenuBase.h"
+#include "Framework/Text/TextLayout.h"
 #include "MainMenu.generated.h"
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class UMainMenu : public UMenuBase
 {
 	GENERATED_BODY()
@@ -61,7 +62,7 @@ private:
 	UPROPERTY(meta = (BindWidget))
 	class UPanelWidget* Serverlist;
 public:
-	UFUNCTION()
+	UFUNCTION(BlueprintCallable, Category = "Main Menu")
 	void SetServerList(
 		TArray<FServerData> InServerData);
 
@@ -83,10 +84,25 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void JoinServer();
 
-	void SetSelectedIndex(uint32 InIndex);
+	UFUNCTION(BlueprintCallable, Category = "Main Menu")
+	void SetSelectedIndex(int32 InIndex);
 private:
-	TOptional<uint32> SelectedIndex;
+	UPROPERTY()
+	bool bHasSelectedIndex = false;
+	
+	UPROPERTY()
+	int32 SelectedIndex = -1;
 
+	// 서버 이름 저장 변수
+	UPROPERTY()
+	FString CachedServerName;
+
+	// ServerHostName 텍스트 변경 이벤트 핸들러
+	UFUNCTION()
+	void OnServerHostNameTextCommitted(const FText& Text, ETextCommit::Type CommitMethod);
+	
+	UFUNCTION()
+	void OnServerHostNameTextChanged(const FText& Text);
 
 	TSubclassOf<UUserWidget> ServerRowClass;
 
