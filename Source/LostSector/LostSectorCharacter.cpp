@@ -309,7 +309,7 @@ void ALostSectorCharacter::HandleOcclusionFade()
 		Params
 	);
 
-	UE_LOG(LogTemp, Warning, TEXT("Total Hits: %d"), HitResults.Num());
+	//UE_LOG(LogTemp, Warning, TEXT("Total Hits: %d"), HitResults.Num());
 
 	for (const FHitResult& Hit : HitResults)
 	{
