@@ -11,7 +11,7 @@ void UMenuBase::SetOwningInstance(IMyInterface* InInstance)
 void UMenuBase::StartUp()
 {
 	AddToViewport(10);
-	bIsFocusable = true;
+	SetIsFocusable(true);
 	FInputModeUIOnly Inputmode;
 	Inputmode.SetWidgetToFocus(TakeWidget());
 	Inputmode.SetLockMouseToViewportBehavior(
@@ -29,8 +29,8 @@ void UMenuBase::StartUp()
 
 void UMenuBase::Shutdown()
 {
-	RemoveFromViewport();
-	bIsFocusable = false;
+	RemoveFromParent();
+	SetIsFocusable(false);
 	
 	FInputModeGameOnly Inputmode;
 	
