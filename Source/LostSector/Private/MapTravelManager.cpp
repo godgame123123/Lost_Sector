@@ -8,7 +8,7 @@ namespace
 {
 	// ServerTravel은 맵 이름만 사용 (DefaultEngine.ini의 GameModeMapPrefixes에 등록된 이름)
 	const TCHAR* LobbyMapName = TEXT("RobbyMap");
-	const TCHAR* GameMapName = TEXT("GameMap");
+	const TCHAR* GameMapName = TEXT("MAP");
 	
 	// OpenLevel용 전체 경로 (확장자 없음)
 	const TCHAR* LobbyMapPath = TEXT("/Game/BattleRoyaleStarterKit/Maps/BattleRoyale_Map_a/RobbyMap");
