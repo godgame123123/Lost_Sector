@@ -42,7 +42,9 @@ void UMainMenu::NativeConstruct()
 				if (UMyGameInstance* MyGameInstance = Cast<UMyGameInstance>(GameInstance))
 				{
 					SetOwningInstance(TScriptInterface<IMyInterface>(MyGameInstance));
-					UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: OwningInstance 자동 설정 완료"));
+					// MyGameInstance의 MainMenu 멤버 변수에 자신을 등록
+					MyGameInstance->RegisterMainMenu(this);
+					UE_LOG(LogTemp, Log, TEXT("[MainMenu] NativeConstruct: OwningInstance 자동 설정 완료 및 MyGameInstance에 등록"));
 				}
 				else
 				{
@@ -332,26 +334,24 @@ void UMainMenu::SetSelectedIndex(int32 InIndex)
 		return;
 	}
 	
-	bHasSelectedIndex = true;
-	SelectedIndex = InIndex;
-	int32 SelectedCount = 0;
-	for (int32 i = 0; i < Serverlist->GetChildrenCount(); ++i)
-	{
-		auto serverRow = Cast<UServerRow>(Serverlist->GetChildAt(i));
-		if (serverRow)
+		bHasSelectedIndex = true;
+		SelectedIndex = InIndex;
+		int32 SelectedCount = 0;
+		for (int32 i = 0; i < Serverlist->GetChildrenCount(); ++i)
 		{
-			bool bWasSelected = serverRow->bSelected;
-			serverRow->bSelected = 
-				(bHasSelectedIndex && 
-					SelectedIndex == i);
-			
-			if (serverRow->bSelected)
+			auto serverRow = Cast<UServerRow>(Serverlist->GetChildAt(i));
+			if (serverRow)
 			{
-				SelectedCount++;
+				bool bIsSelected = (bHasSelectedIndex && SelectedIndex == i);
+				serverRow->UpdateSelectionState(bIsSelected);
+				
+				if (serverRow->bSelected)
+				{
+					SelectedCount++;
+				}
 			}
 		}
-	}
-	UE_LOG(LogTemp, Log, TEXT("[MainMenu] SetSelectedIndex: 선택 완료 (선택된 항목 수: %d)"), SelectedCount);
+		UE_LOG(LogTemp, Log, TEXT("[MainMenu] SetSelectedIndex: 선택 완료 (선택된 항목 수: %d)"), SelectedCount);
 }
 
 void UMainMenu::SetServerList(
@@ -412,11 +412,23 @@ void UMainMenu::SetServerList(
 			continue; // 이 서버 항목을 건너뛰고 다음으로
 		}
 
-		ServerRow->ServerName->SetText(FText::FromString(ServerData.Name));
-		ServerRow->HostUser->SetText(FText::FromString(ServerData.HostUserName));
-
-		FString FractionText = FString::Printf(TEXT("%d/%d"), ServerData.CurrentPlayers, ServerData.MaxPlayers);
-		ServerRow->ConnectionFraction->SetText(FText::FromString(FractionText));
+		if (ServerRow->ServerName)
+		{
+			ServerRow->ServerName->SetText(FText::FromString(ServerData.Name));
+		}
+		
+		if (ServerRow->HostUser)
+		{
+			// 호스트 이름이 비어있으면 기본값 사용
+			FString HostName = ServerData.HostUserName.IsEmpty() ? TEXT("Unknown Host") : ServerData.HostUserName;
+			ServerRow->HostUser->SetText(FText::FromString(HostName));
+		}
+		
+		if (ServerRow->ConnectionFraction)
+		{
+			FString FractionText = FString::Printf(TEXT("%d/%d"), ServerData.CurrentPlayers, ServerData.MaxPlayers);
+			ServerRow->ConnectionFraction->SetText(FText::FromString(FractionText));
+		}
 		ServerRow->SetUp(this, i++);
 		Serverlist->AddChild(ServerRow);
 		SuccessCount++;

@@ -359,17 +359,18 @@ void ALostSectorCharacter::HandleOcclusionFade()
 
 	//UE_LOG(LogTemp, Warning, TEXT("Total Hits: %d"), HitResults.Num());
 
-	for (const FHitResult& Hit : HitResults)
-	{
-		if (Hit.GetActor())
-		{
-			// ➡️ 충돌한 모든 액터의 이름 출력
-			UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s - Component: %s"),
-				*Hit.GetActor()->GetName(),
-				*Hit.GetComponent()->GetName()
-			);
-		}
-	}
+	// 디버그 로그 제거 (성능 및 로그 스팸 방지)
+	// for (const FHitResult& Hit : HitResults)
+	// {
+	// 	if (Hit.GetActor())
+	// 	{
+	// 		// ➡️ 충돌한 모든 액터의 이름 출력
+	// 		UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s - Component: %s"),
+	// 			*Hit.GetActor()->GetName(),
+	// 			*Hit.GetComponent()->GetName()
+	// 		);
+	// 	}
+	// }
 	// 현재 프레임에서 Line Trace에 걸린 모든 액터를 저장할 집합
 	TSet<AActor*> CurrentOccludingActorsSet; // TSet을 사용하여 중복을 제거합니다.
 

@@ -19,6 +19,10 @@ public:
 	// 블루프린트에서도 사용할 수 있도록 이벤트 노출
 	UFUNCTION(BlueprintImplementableEvent, Category = "Server Row")
 	void OnServerRowClicked();
+	
+	// 선택 상태 업데이트 (시각적 피드백용)
+	UFUNCTION(BlueprintCallable, Category = "Server Row")
+	void UpdateSelectionState(bool bIsSelected);
 
 private:
 	UFUNCTION()

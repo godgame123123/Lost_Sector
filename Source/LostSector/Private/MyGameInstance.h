@@ -60,6 +60,10 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void LoadCreateGameMenu();
+	
+	// MainMenu 자동 등록 (Blueprint에서 생성된 MainMenu가 자신을 등록할 때 사용)
+	UFUNCTION(BlueprintCallable)
+	void RegisterMainMenu(class UMainMenu* InMainMenu);
 
 	//�����
 	UFUNCTION(Exec)
@@ -126,5 +130,8 @@ private:
 	IOnlineSessionPtr SessionInterface; //���� �����Ҷ� ���� �������̽�
 
 	TSharedPtr<FOnlineSessionSearch> SessionSearch;
+	
+	// 중복 검색 요청 방지
+	bool bIsSearchingForSessions = false;
 
 };
