@@ -22,6 +22,7 @@ void UInteractionComponent::Use()
         // 서버에게 캐릭터 위치와 방향 전달
         FVector Start = C->GetActorLocation();
         FVector Forward = C->GetActorForwardVector();
+        UE_LOG(LogTemp, Warning, TEXT("Use Pressed"));
 
         Server_Use(Start, Forward.Rotation());
     }
@@ -52,6 +53,16 @@ void UInteractionComponent::Server_Use_Implementation(
         FCollisionShape::MakeSphere(SphereRadius),
         Params
     );
+    if (!bHit)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Trace: No Hit"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Trace Hit: %s"), *Hit.GetActor()->GetName());
+    }
+
+
 
     // 디버그용
     //DrawDebugSphere(GetWorld(), Hit.Location, SphereRadius, 12, FColor::Cyan, false, 1.5f);
@@ -66,9 +77,6 @@ void UInteractionComponent::Server_Use_Implementation(
 
     if (Target->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
     {
-        if (IInteractable* I = Cast<IInteractable>(Target))
-        {
-            I->Interact(C);
-        }
+        IInteractable::Execute_Interact(Target, C);
     }
 }
