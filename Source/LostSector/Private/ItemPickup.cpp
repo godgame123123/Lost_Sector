@@ -50,6 +50,17 @@ void AItemPickup::OnConstruction(const FTransform& Transform)
     ApplyVisualFromData();
 }
 
+void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+    Super::PostEditChangeProperty(PropertyChangedEvent);
+    
+    // 에디터에서 Stack 프로퍼티가 변경될 때 시각 업데이트
+    if (PropertyChangedEvent.Property && PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(AItemPickup, Stack))
+    {
+        ApplyVisualFromData();
+    }
+}
+
 void AItemPickup::OnRep_Stack()
 {
     ApplyVisualFromData();

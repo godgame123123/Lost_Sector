@@ -3,6 +3,8 @@
 #include "UObject/Interface.h"
 #include "Interactable.generated.h"
 
+class ACharacter;
+
 UINTERFACE(BlueprintType)
 class LOSTSECTOR_API UInteractable : public UInterface
 {

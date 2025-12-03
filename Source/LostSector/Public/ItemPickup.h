@@ -40,8 +40,10 @@ protected:
 public:
 
     // 🔥 위치 튀는 버그 해결
-    // Unreal Engine 5.3에서는 PostEditMove와 PostEditChangeProperty가 AActor의 멤버가 아니므로 제거
-    // 대신 OnConstruction에서 처리합니다.
+    // Unreal Engine 5.3에서는 PostEditMove가 AActor의 멤버가 아니므로 제거
+    // PostEditChangeProperty는 UObject의 멤버이므로 사용 가능 (에디터에서 프로퍼티 변경 시 시각 업데이트)
+    virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
     
-    virtual void Interact(class ACharacter* ByWho) override;
+    // BlueprintNativeEvent 구현 (override 키워드 사용 불가 - BlueprintNativeEvent는 가상 함수가 아님)
+    virtual void Interact_Implementation(ACharacter* ByWho);
 };
