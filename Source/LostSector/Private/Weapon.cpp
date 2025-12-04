@@ -5,9 +5,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "AIController.h" 
 #include "EngineUtils.h"
-#include "NiagaraFunctionLibrary.h" // ³ªÀÌ¾Æ°¡¶ó ÇÔ¼ö ¶óÀÌºê·¯¸®
+#include "NiagaraFunctionLibrary.h" // ï¿½ï¿½ï¿½Ì¾Æ°ï¿½ï¿½ï¿½ ï¿½Ô¼ï¿½ ï¿½ï¿½ï¿½Ìºê·¯ï¿½ï¿½
 #include "NiagaraComponent.h"
-#include "Components/SkeletalMeshComponent.h" // ½ºÄÌ·¹Å» ¸Ş½Ã ÄÄÆ÷³ÍÆ® Á¢±ÙÀ» À§ÇØ
+#include "Components/SkeletalMeshComponent.h" // ï¿½ï¿½ï¿½Ì·ï¿½Å» ï¿½Ş½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 #include "ATracer.h"
 #include "Animation/AnimInstance.h"
 #include "InventoryComponent.h"
@@ -17,14 +17,18 @@ AWeapon::AWeapon()
 {
     PrimaryActorTick.bCanEverTick = false;
 
-    // ·çÆ® ÄÄÆ÷³ÍÆ® »ı¼º
+    // ë¦¬í”Œë¦¬ì¼€ì´ì…˜ ì„¤ì •
+    bReplicates = true;
+    SetReplicateMovement(true);
+
+    // ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
     RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
-    // ½ºÅÂÆ½ ¸Ş½¬ ÄÄÆ÷³ÍÆ® »ı¼º ¹× ·çÆ®¿¡ ºÎÂø
+    // ï¿½ï¿½ï¿½ï¿½Æ½ ï¿½Ş½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     WeaponMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WeaponMesh"));
     WeaponMesh->SetupAttachment(RootComponent);
 
-    // ÃÑ±¸ À§Ä¡ ÄÄÆ÷³ÍÆ® »ı¼º (¹ß»ç ½ÃÀÛ ÁöÁ¡)
+    // ï¿½Ñ±ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ (ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     MuzzleLocation = CreateDefaultSubobject<USceneComponent>(TEXT("MuzzleLocation"));
     MuzzleLocation->SetupAttachment(WeaponMesh.Get());
 
@@ -35,15 +39,15 @@ void AWeapon::BeginPlay()
 {
     Super::BeginPlay();
 
-    // BeginPlay ½ÃÁ¡¿¡ ¸Ş½¬ º¸Á¤ °ªÀ» Àû¿ëÇÕ´Ï´Ù.
+    // BeginPlay ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ş½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
     if (WeaponMesh)
     {
-        // 1. »ó´ë À§Ä¡ (Location) ¹× È¸Àü (Rotation) Àû¿ë
+        // 1. ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ (Location) ï¿½ï¿½ È¸ï¿½ï¿½ (Rotation) ï¿½ï¿½ï¿½ï¿½
         WeaponMesh->SetRelativeLocation(MeshOffsetLocation);
         WeaponMesh->SetRelativeRotation(MeshOffsetRotation);
 
-        // 2. ½ºÄÉÀÏµµ º¸Á¤ÇØ¾ß ÇÑ´Ù¸é (ÃÑ Å©±â°¡ ´Ù¸¦ °æ¿ì)
-        // WeaponMesh->SetRelativeScale3D(FVector(1.0f)); // ÇÊ¿äÇÑ ½ºÄÉÀÏ °ª Àû¿ë
+        // 2. ï¿½ï¿½ï¿½ï¿½ï¿½Ïµï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ø¾ï¿½ ï¿½Ñ´Ù¸ï¿½ (ï¿½ï¿½ Å©ï¿½â°¡ ï¿½Ù¸ï¿½ ï¿½ï¿½ï¿½)
+        // WeaponMesh->SetRelativeScale3D(FVector(1.0f)); // ï¿½Ê¿ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     }
 }
 
@@ -54,37 +58,37 @@ void AWeapon::ResetFire()
 
 void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
 {
-    // [È÷Æ®½ºÄµ ·ÎÁ÷]
+    // [ï¿½ï¿½Æ®ï¿½ï¿½Äµ ï¿½ï¿½ï¿½ï¿½]
     FVector End = Start + (Direction * MaxRange);
     FHitResult HitResult;
 
-    // Trace ChannelÀ» Visibility ¶Ç´Â Custom Trace Channel·Î ¼³Á¤
+    // Trace Channelï¿½ï¿½ Visibility ï¿½Ç´ï¿½ Custom Trace Channelï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this); // ¹«±â ¾×ÅÍ´Â Æ®·¹ÀÌ½º¿¡¼­ Á¦¿Ü
+    Params.AddIgnoredActor(this); // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Í´ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
     AController* InstigatorController = GetInstigatorController();
     AActor* InstigatorPawn = GetInstigator();
 
     if (InstigatorPawn)
     {
-        Params.AddIgnoredActor(InstigatorPawn); // ¹ß»çÀÚ(Instigator Pawn)µµ ¹«½Ã ¸ñ·Ï¿¡ Ãß°¡
+        Params.AddIgnoredActor(InstigatorPawn); // ï¿½ß»ï¿½ï¿½ï¿½(Instigator Pawn)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ï¿ï¿½ ï¿½ß°ï¿½
 
-        // ¹ß»çÀÚ°¡ AI ControllerÀÇ Á¦¾î¸¦ ¹Ş°í ÀÖ´Ù¸é (Áï, AI°¡ °ø°İ ÁßÀÌ¶ó¸é)
+        // ï¿½ß»ï¿½ï¿½Ú°ï¿½ AI Controllerï¿½ï¿½ ï¿½ï¿½ï¿½î¸¦ ï¿½Ş°ï¿½ ï¿½Ö´Ù¸ï¿½ (ï¿½ï¿½, AIï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½)
         if (InstigatorController && InstigatorController->IsA<AAIController>())
         {
             UWorld* World = GetWorld();
             if (World)
             {
-                // ¿ùµå ³»ÀÇ ¸ğµç Pawn (Ä³¸¯ÅÍ)À» ¼øÈ¸ÇÕ´Ï´Ù.
+                // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ Pawn (Ä³ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ ï¿½ï¿½È¸ï¿½Õ´Ï´ï¿½.
                 for (TActorIterator<APawn> It(World); It; ++It)
                 {
                     APawn* Pawn = *It;
 
-                    // 1. PawnÀÌ À¯È¿ÇÏ°í 2. ÇÃ·¹ÀÌ¾î°¡ Á¦¾îÇÏÁö ¾Ê´Â °æ¿ì (Áï, ´Ù¸¥ AI/NPCÀÎ °æ¿ì)
-                    // (Ãß°¡ÀûÀ¸·Î ÆÀ Ã¼Å© ·ÎÁ÷À» ³ÖÀ» ¼ö ÀÖÁö¸¸, ¿©±â¼­´Â °£´ÜÈ÷ AI/NPC·Î ±¸ºĞ)
+                    // 1. Pawnï¿½ï¿½ ï¿½ï¿½È¿ï¿½Ï°ï¿½ 2. ï¿½Ã·ï¿½ï¿½Ì¾î°¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ê´ï¿½ ï¿½ï¿½ï¿½ (ï¿½ï¿½, ï¿½Ù¸ï¿½ AI/NPCï¿½ï¿½ ï¿½ï¿½ï¿½)
+                    // (ï¿½ß°ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ Ã¼Å© ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ AI/NPCï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
                     if (Pawn && !Pawn->IsPlayerControlled())
                     {
-                        // ÇØ´ç AI/NPC Ä³¸¯ÅÍ¸¦ ¶óÀÎ Æ®·¹ÀÌ½º ¹«½Ã ¸ñ·Ï¿¡ Ãß°¡ÇÕ´Ï´Ù.
+                        // ï¿½Ø´ï¿½ AI/NPC Ä³ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½ï¿½ï¿½ï¿½ Æ®ï¿½ï¿½ï¿½Ì½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ï¿ï¿½ ï¿½ß°ï¿½ï¿½Õ´Ï´ï¿½.
                         Params.AddIgnoredActor(Pawn);
                     }
                 }
@@ -96,7 +100,7 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
         HitResult,
         Start,
         End,
-        ECollisionChannel::ECC_Visibility, // ÇÊ¿ä¿¡ µû¶ó º¯°æ
+        ECollisionChannel::ECC_Visibility, // ï¿½Ê¿ä¿¡ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         Params
     );
 
@@ -108,7 +112,7 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
         SpawnParams.Owner = this;
         SpawnParams.Instigator = GetInstigator();
 
-        // Æ®·¹ÀÌ¼­ ¾×ÅÍ¸¦ ÃÑ±¸ À§Ä¡(Start)¿¡ »ı¼º
+        // Æ®ï¿½ï¿½ï¿½Ì¼ï¿½ ï¿½ï¿½ï¿½Í¸ï¿½ ï¿½Ñ±ï¿½ ï¿½ï¿½Ä¡(Start)ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         AATracer* TracerActor = GetWorld()->SpawnActor<AATracer>(
             TracerActorClass,
             Start,
@@ -118,12 +122,12 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
 
         if (TracerActor)
         {
-            // 2. [ÀÌµ¿ Áö½Ã] TargetLocation°ú ¼Óµµ¸¦ Àü´ŞÇÕ´Ï´Ù.
-            //     ÀÌ ÇÔ¼ö È£ÃâÀ» ´©¶ôÇÏ¸é AATracerÀÇ TargetLocation º¯¼ö´Â ±âº»°ª (FVector::ZeroVector)À¸·Î ³²¾ÆÀÖ°Ô µË´Ï´Ù.
+            // 2. [ï¿½Ìµï¿½ ï¿½ï¿½ï¿½ï¿½] TargetLocationï¿½ï¿½ ï¿½Óµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
+            //     ï¿½ï¿½ ï¿½Ô¼ï¿½ È£ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï¸ï¿½ AATracerï¿½ï¿½ TargetLocation ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½âº»ï¿½ï¿½ (FVector::ZeroVector)ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ö°ï¿½ ï¿½Ë´Ï´ï¿½.
 
-            const float BulletSpeed = 20000.0f; // ¸Å¿ì ºü¸¥ ¼Óµµ·Î ¼³Á¤ (´ÜÀ§: cm/s)
+            const float BulletSpeed = 20000.0f; // ï¿½Å¿ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Óµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½: cm/s)
 
-            // AATracer::StartMoving ÇÔ¼ö È£Ãâ
+            // AATracer::StartMoving ï¿½Ô¼ï¿½ È£ï¿½ï¿½
             TracerActor->StartMoving(TargetLocation, BulletSpeed);
         }
         else
@@ -133,14 +137,14 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
     }
     
 
-    // 2. È÷Æ® ÀÓÆÑÆ® ÀÌÆåÆ® »ı¼º (¸Â¾ÒÀ» °æ¿ì¿¡¸¸)
-    if (bHit && HitImpactFX) // AWeapon.h¿¡ ¼±¾ğµÈ UNiagaraSystem* HitImpactFX º¯¼ö »ç¿ë
+    // 2. ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ (ï¿½Â¾ï¿½ï¿½ï¿½ ï¿½ï¿½ì¿¡ï¿½ï¿½)
+    if (bHit && HitImpactFX) // AWeapon.hï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ UNiagaraSystem* HitImpactFX ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     {
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(
             GetWorld(),
             HitImpactFX,
             HitResult.Location,
-            HitResult.ImpactNormal.Rotation(), // ¸ÂÀº ¸éÀÇ ¹ı¼± ¹æÇâÀ¸·Î È¸Àü
+            HitResult.ImpactNormal.Rotation(), // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ È¸ï¿½ï¿½
             FVector(1.0f),
             true,
             true
@@ -149,17 +153,17 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
 
     //FColor LineColor = bHit ? FColor::Red : FColor::Green;
 
-    // DrawDebugLine ÇÔ¼ö´Â Kismet/KismetMathLibrary.h ¿¡ Á¤ÀÇµÇ¾î ÀÖ½À´Ï´Ù.
-    // ÇöÀç ÄÚµå¿¡´Â #include "Kismet/KismetMathLibrary.h" °¡ Æ÷ÇÔµÇ¾î ÀÖÀ¸¹Ç·Î ¹Ù·Î »ç¿ë °¡´ÉÇÕ´Ï´Ù.
+    // DrawDebugLine ï¿½Ô¼ï¿½ï¿½ï¿½ Kismet/KismetMathLibrary.h ï¿½ï¿½ ï¿½ï¿½ï¿½ÇµÇ¾ï¿½ ï¿½Ö½ï¿½ï¿½Ï´ï¿½.
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½Úµå¿¡ï¿½ï¿½ #include "Kismet/KismetMathLibrary.h" ï¿½ï¿½ ï¿½ï¿½ï¿½ÔµÇ¾ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½Ù·ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
     //DrawDebugLine(
     //    GetWorld(),
     //    Start,
-    //    bHit ? HitResult.Location : End, // È÷Æ®ÇßÀ¸¸é È÷Æ® ÁöÁ¡±îÁö, ¾Æ´Ï¸é ÃÖ´ë »ç°Å¸®±îÁö
+    //    bHit ? HitResult.Location : End, // ï¿½ï¿½Æ®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½, ï¿½Æ´Ï¸ï¿½ ï¿½Ö´ï¿½ ï¿½ï¿½Å¸ï¿½ï¿½ï¿½ï¿½ï¿½
     //    LineColor,
-    //    false,      // bPersistentLines (¿µ±¸ÀûÀÌÁö ¾ÊÀ½)
-    //    5.0f,       // LifeTime (5ÃÊ°£ Ç¥½Ã)
+    //    false,      // bPersistentLines (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
+    //    5.0f,       // LifeTime (5ï¿½Ê°ï¿½ Ç¥ï¿½ï¿½)
     //    0,          // DepthPriority
-    //    3.0f        // Thickness (¼±ÀÇ µÎ²²)
+    //    3.0f        // Thickness (ï¿½ï¿½ï¿½ï¿½ ï¿½Î²ï¿½)
     //);
 
     if (bHit)
@@ -167,20 +171,20 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
         AActor* HitActor = HitResult.GetActor();
         if (HitActor)
         {
-            // µ¥¹ÌÁö Àû¿ë
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             UGameplayStatics::ApplyDamage(
                 HitActor,
                 Damage,
-                GetInstigatorController(), // ¹ß»çÇÑ Ä³¸¯ÅÍÀÇ ÄÁÆ®·Ñ·¯¸¦ µ¥¹ÌÁö À¯¹ßÀÚ·Î Àü´Ş
+                GetInstigatorController(), // ï¿½ß»ï¿½ï¿½ï¿½ Ä³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Æ®ï¿½Ñ·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ú·ï¿½ ï¿½ï¿½ï¿½ï¿½
                 this,
                 nullptr // DamageTypeClass
             );
 
-            // TODO: ÇÇ°İ ÀÌÆåÆ® ¹× »ç¿îµå »ı¼º (HitResult.Location, HitResult.ImpactNormal »ç¿ë)
+            // TODO: ï¿½Ç°ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ (HitResult.Location, HitResult.ImpactNormal ï¿½ï¿½ï¿½)
         }
     }
 
-    // TODO: ÃÑ±¸ È­¿° (Muzzle Flash) ¹× ÅºÇÇ ¹èÃâ ÀÌÆåÆ® »ı¼º
+    // TODO: ï¿½Ñ±ï¿½ È­ï¿½ï¿½ (Muzzle Flash) ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½Æ® ï¿½ï¿½ï¿½ï¿½
 }
 
 void AWeapon::Fire(FVector Direction)
@@ -197,10 +201,10 @@ void AWeapon::Fire(FVector Direction)
         return;
     }
 
-    // CurrentAmmo°¡ 0ÀÌ¸é ÀÎº¥Åä¸®¿¡¼­ ÃÑ¾Ë È®ÀÎ
+    // CurrentAmmoï¿½ï¿½ 0ï¿½Ì¸ï¿½ ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ¾ï¿½ È®ï¿½ï¿½
     if (CurrentAmmo <= 0)
     {
-        // ÀÎº¥Åä¸®¿¡¼­ ÃÑ¾Ë ¼ö·® È®ÀÎ
+        // ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ¾ï¿½ ï¿½ï¿½ï¿½ï¿½ È®ï¿½ï¿½
         APawn* OwnerPawn = Cast<APawn>(GetOwner());
         if (OwnerPawn)
         {
@@ -216,10 +220,10 @@ void AWeapon::Fire(FVector Direction)
                 }
                 else
                 {
-                    // ÀÎº¥Åä¸®¿¡ ÃÑ¾ËÀÌ ÀÖÀ¸¸é ÀÚµ¿À¸·Î ÀçÀåÀü ½Ãµµ
+                    // ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ ï¿½Ñ¾ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Úµï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ãµï¿½
                     UE_LOG(LogTemp, Log, TEXT("Auto-reload: Found %d ammo in inventory"), AmmoCount);
                     WeaponReload();
-                    return; // ÀçÀåÀü ÁßÀÌ¹Ç·Î ¹ß»ç ºÒ°¡
+                    return; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¹Ç·ï¿½ ï¿½ß»ï¿½ ï¿½Ò°ï¿½
                 }
             }
             else if (!RequiredAmmoItemData)
@@ -233,8 +237,8 @@ void AWeapon::Fire(FVector Direction)
         return;
     }
 
-    // ±âÁ¸ ¹ß»ç ·ÎÁ÷ °è¼Ó
-    if (false) // ÀÌÀü Ã¼Å©´Â À§¿¡¼­ Ã³¸®ÇßÀ¸¹Ç·Î ¿©±â¼­´Â Ç×»ó false
+    // ï¿½ï¿½ï¿½ï¿½ ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
+    if (false) // ï¿½ï¿½ï¿½ï¿½ Ã¼Å©ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Ã³ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ ï¿½ï¿½ï¿½â¼­ï¿½ï¿½ ï¿½×»ï¿½ false
     {
         
         UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: bCanFire=%s, Ammo=%d"),
@@ -337,7 +341,7 @@ void AWeapon::WeaponReload()
         UE_LOG(LogTemp, Warning, TEXT("%s: Already reloading."), *GetName());
         return;
     }
-    // 1. ÀÌ¹Ì ÃÖ´ë Åº¾àÀÌ¶ó¸é ÀçÀåÀü ºÒÇÊ¿ä
+    // 1. ï¿½Ì¹ï¿½ ï¿½Ö´ï¿½ Åºï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ê¿ï¿½
     if (CurrentAmmo >= MaxAmmo)
     {
         UE_LOG(LogTemp, Log, TEXT("%s: Ammo is already full (%d/%d)."), *GetName(), CurrentAmmo, MaxAmmo);
@@ -348,12 +352,12 @@ void AWeapon::WeaponReload()
         ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
         if (Character)
         {
-            Character->SetReloadingTextVisible(false); // ÀçÀåÀü ºÒÇÊ¿ä ½Ã Áï½Ã À§Á¬ ¼û±è
+            Character->SetReloadingTextVisible(false); // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½Ê¿ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         }
         return;
     }
 
-    // 2. ¼ÒÀ¯ÀÚ(Pawn)¿Í ÀÎº¥Åä¸® ÄÄÆ÷³ÍÆ® Ã£±â
+    // 2. ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½(Pawn)ï¿½ï¿½ ï¿½Îºï¿½ï¿½ä¸® ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ® Ã£ï¿½ï¿½
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
     if (!OwnerPawn || !RequiredAmmoItemData)
     {
@@ -368,7 +372,7 @@ void AWeapon::WeaponReload()
         return;
     }
 
-    // 3. ÇÊ¿äÇÑ Åº¾à ¼ö °è»ê ¹× ÀÎº¥Åä¸®¿¡¼­ »ç¿ë °¡´ÉÇÑ ÃÑ¾Ë ¼ö È®ÀÎ
+    // 3. ï¿½Ê¿ï¿½ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ñ¾ï¿½ ï¿½ï¿½ È®ï¿½ï¿½
     int32 AmmoNeeded = MaxAmmo - CurrentAmmo;
     int32 AvailableAmmo = InventoryComp->GetItemCountByItemData(RequiredAmmoItemData);
 
@@ -380,8 +384,8 @@ void AWeapon::WeaponReload()
 
     UE_LOG(LogTemp, Log, TEXT("%s: Starting reload for %f seconds..."), *GetName(), ReloadDuration);
 
-    bIsReloading = true; // ÀçÀåÀü ÇÃ·¡±× ¼³Á¤
-    bCanFire = false;    // ÀçÀåÀü Áß ¹ß»ç ¹æÁö (Fire ÇÔ¼ö¿¡¼­ Ã¼Å©)
+    bIsReloading = true; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    bCanFire = false;    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ß»ï¿½ ï¿½ï¿½ï¿½ï¿½ (Fire ï¿½Ô¼ï¿½ï¿½ï¿½ï¿½ï¿½ Ã¼Å©)
 
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
@@ -390,10 +394,10 @@ void AWeapon::WeaponReload()
     }
 
     GetWorld()->GetTimerManager().SetTimer(
-        ReloadTimerHandle, // Àç»ç¿ë (Å¸ÀÌ¸Ó ÇÚµéÀ» µû·Î µÎ´Â °ÍÀÌ ´õ ÁÁ½À´Ï´Ù. ¿¹: ReloadTimerHandle)
+        ReloadTimerHandle, // ï¿½ï¿½ï¿½ï¿½ (Å¸ï¿½Ì¸ï¿½ ï¿½Úµï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Î´ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½Ï´ï¿½. ï¿½ï¿½: ReloadTimerHandle)
         this,
         &AWeapon::FinishReload,
-        ReloadDuration, // AWeapon.h¿¡¼­ Á¤ÀÇÇÑ ½Ã°£ »ç¿ë
+        ReloadDuration, // AWeapon.hï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã°ï¿½ ï¿½ï¿½ï¿½
         false
     );
 }
@@ -406,24 +410,24 @@ void AWeapon::FinishReload()
         Character->SetReloadingTextVisible(false);
     }
 
-    // 1. ÇÃ·¡±× ÇØÁ¦
+    // 1. ï¿½Ã·ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     bIsReloading = false;
 
-    // 2. ¼ÒÀ¯ÀÚ¿Í ÀÎº¥Åä¸® Ã£±â (WeaponReload¿¡¼­¿Í µ¿ÀÏ)
+    // 2. ï¿½ï¿½ï¿½ï¿½ï¿½Ú¿ï¿½ ï¿½Îºï¿½ï¿½ä¸® Ã£ï¿½ï¿½ (WeaponReloadï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½)
     APawn* OwnerPawn = Cast<APawn>(GetOwner());
     if (!OwnerPawn || !RequiredAmmoItemData) return;
     UInventoryComponent* InventoryComp = OwnerPawn->FindComponentByClass<UInventoryComponent>();
     if (!InventoryComp) return;
 
-    // 3. ÇÊ¿äÇÑ Åº¾à ¼ö °è»ê ¹× ÀÎº¥Åä¸®¿¡¼­ °¡Á®¿Ã Åº¾à °áÁ¤
+    // 3. ï¿½Ê¿ï¿½ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
     int32 AmmoNeeded = MaxAmmo - CurrentAmmo;
     int32 AvailableAmmo = InventoryComp->GetItemCountByItemData(RequiredAmmoItemData);
     int32 AmmoToTake = FMath::Min(AmmoNeeded, AvailableAmmo);
 
-    // 4. ÀÎº¥Åä¸®¿¡¼­ Åº¾à Á¦°Å ¿äÃ»
+    // 4. ï¿½Îºï¿½ï¿½ä¸®ï¿½ï¿½ï¿½ï¿½ Åºï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã»
     int32 RemovedCount = InventoryComp->RemoveItemByItemData(RequiredAmmoItemData, AmmoToTake);
 
-    // 5. ÅºÃ¢ ¾÷µ¥ÀÌÆ®
+    // 5. ÅºÃ¢ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Æ®
     if (RemovedCount > 0)
     {
         CurrentAmmo += RemovedCount;
@@ -435,6 +439,6 @@ void AWeapon::FinishReload()
         UE_LOG(LogTemp, Warning, TEXT("RELOAD FINISHED: No ammo taken from inventory. Current Ammo: %d"), CurrentAmmo);
     }
 
-    // ÀçÀåÀü Áß¿¡´Â ¹ß»ç°¡ ¸·Çô ÀÖ¾úÀ¸¹Ç·Î, È¤½Ã ¸ğ¸¦ »óÈ²À» ´ëºñÇØ Fire »óÅÂ¸¦ Àç¼³Á¤ÇÕ´Ï´Ù.
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ß¿ï¿½ï¿½ï¿½ ï¿½ß»ç°¡ ï¿½ï¿½ï¿½ï¿½ ï¿½Ö¾ï¿½ï¿½ï¿½ï¿½Ç·ï¿½, È¤ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½È²ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ Fire ï¿½ï¿½ï¿½Â¸ï¿½ ï¿½ç¼³ï¿½ï¿½ï¿½Õ´Ï´ï¿½.
     ResetFire();
 }

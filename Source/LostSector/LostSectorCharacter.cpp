@@ -306,10 +306,35 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 			RotationSpeed
 		);
 
-		SetActorRotation(FRotator(0.0f, NewRotation.Yaw, 0.0f));
-
+		FRotator FinalRotation = FRotator(0.0f, NewRotation.Yaw, 0.0f);
+		
+		// 로컬 플레이어는 즉시 회전 적용
+		if (IsLocallyControlled())
+		{
+			SetActorRotation(FinalRotation);
+			
+			// 서버로 회전 정보 전송 (변경이 있을 때만)
+			if (GetLocalRole() < ROLE_Authority)
+			{
+				Server_UpdateRotation(FinalRotation);
+			}
+		}
+		else
+		{
+			// 클라이언트에서는 서버에서 리플리케이트된 회전 정보 사용 (로컬 플레이어 제외)
+			if (ReplicatedRotation != FRotator::ZeroRotator)
+			{
+				SetActorRotation(FRotator(0.0f, ReplicatedRotation.Yaw, 0.0f));
+			}
+		}
+		
+		// 서버에서 회전 정보 리플리케이트
+		if (HasAuthority())k 
+		{
+			ReplicatedRotation = FinalRotation;
+		}
 	}
-}
+                                                                                                    }
 void ALostSectorCharacter::SetActorOpacity(UPrimitiveComponent* MeshComp, float TargetOpacity)
 {
 	if (!MeshComp || !IsValid(MeshComp)) return; // MeshComp 유효성 확인 추가
@@ -614,6 +639,24 @@ void ALostSectorCharacter::EquipWeapon()
 
 void ALostSectorCharacter::StartFire()
 {
+	// 클라이언트에서 서버로 RPC 호출
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		Server_StartFire();
+		return;
+	}
+
+	// 서버에서 실제 발사 로직 실행
+	Server_StartFire();
+}
+
+bool ALostSectorCharacter::Server_StartFire_Validate()
+{
+	return true;
+}
+
+void ALostSectorCharacter::Server_StartFire_Implementation()
+{
 	if (bIsSprinting || !CurrentWeapon)
 	{
 		return;
@@ -707,10 +750,39 @@ void ALostSectorCharacter::StartFire()
 
 void ALostSectorCharacter::StopFire()
 {
+	// 클라이언트에서 서버로 RPC 호출
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		Server_StopFire();
+		return;
+	}
+
+	// 서버에서 실제 정지 로직 실행
+	Server_StopFire();
+}
+
+bool ALostSectorCharacter::Server_StopFire_Validate()
+{
+	return true;
+}
+
+void ALostSectorCharacter::Server_StopFire_Implementation()
+{
 	if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
 	{
 		GetWorldTimerManager().ClearTimer(FireTimerHandle);
 	}
+}
+
+bool ALostSectorCharacter::Server_UpdateRotation_Validate(FRotator NewRotation)
+{
+	return true;
+}
+
+void ALostSectorCharacter::Server_UpdateRotation_Implementation(FRotator NewRotation)
+{
+	ReplicatedRotation = NewRotation;
+	SetActorRotation(NewRotation);
 }
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)
@@ -934,4 +1006,6 @@ void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 
 	// [DOREPLIFETIME 표준 사용] CharacterStats 변수 전체를 복제 대상으로 등록
 	DOREPLIFETIME(ALostSectorCharacter, CharacterStats);
+	DOREPLIFETIME(ALostSectorCharacter, HeadPitch);
+	DOREPLIFETIME(ALostSectorCharacter, ReplicatedRotation);
 }
