@@ -102,8 +102,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StartFire();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StartFire();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StopFire();
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_StopFire();
 public:
 
 	// 플레이어 사망 처리
@@ -170,6 +176,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SetReloadingTextVisible(bool bShow); // 함수명 변경 (ShowReloadingText 대신 SetReloadingTextVisible 사용)
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Look")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Look", Replicated)
 	float HeadPitch = 0.0f; // ⬅️ 이 변수를 추가합니다.
+
+	UPROPERTY(Replicated)
+	FRotator ReplicatedRotation;
+
+	// 회전 정보를 서버로 전송하는 RPC
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_UpdateRotation(FRotator NewRotation);
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };
