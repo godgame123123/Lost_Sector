@@ -234,7 +234,7 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 
 					// 6. 각도 제한 및 HeadPitch 변수에 저장
 					// Aim Offset이 받는 피치 각도를 보통 -45도(숙임) ~ +45도(들음) 사이로 제한합니다.
-					HeadPitch = FMath::Clamp(AngleDeg, -45.0f, 45.0f);
+					HeadPitch = FMath::Clamp(AngleDeg, -80.0f, 80.0f);
 				}
 			}
 		}
@@ -329,7 +329,7 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 		}
 		
 		// 서버에서 회전 정보 리플리케이트
-		if (HasAuthority())k 
+		if (HasAuthority()) 
 		{
 			ReplicatedRotation = FinalRotation;
 		}
@@ -487,6 +487,10 @@ void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 }
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
+	if (!IsPlayerControlled())
+	{
+		return;
+	}
 	const float MaxStamina = 100.0f;
 	float StaminaChange = 0.0f;
 
