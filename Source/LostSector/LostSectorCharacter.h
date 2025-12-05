@@ -7,6 +7,7 @@
 #include "Logging/LogMacros.h"
 #include "CharacterDataStructs.h"
 #include "Components/WidgetComponent.h"
+#include "Animation/AnimMontage.h"
 #include "LostSectorCharacter.generated.h"
 
 class USpringArmComponent;
@@ -49,6 +50,10 @@ class ALostSectorCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReloadAction;
 
+	/** Fire Input Action */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* FireAction;
+
 public:
 	ALostSectorCharacter();
 
@@ -88,8 +93,28 @@ private:
 
 	FTimerHandle FireTimerHandle;
 
+	FTimerHandle RollingTimerHandle;
+
+	UFUNCTION()
+	void OnRollingEnd();
+
 	void SetActorOpacity(UPrimitiveComponent* MeshComp, float TargetOpacity);
 public:
+	// 구르기 관련 변수
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
+	bool Rolling = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	UAnimMontage* RollingAnimMontage;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float RollingAnimPlayRate = 0.8f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float RollingDuration = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float RollingStaminaCost = 20.0f;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<class AWeapon> CurrentWeapon;
 
@@ -99,22 +124,64 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void EquipWeapon();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_EquipWeapon();
+
+	// 블루프린트에서 구현 가능한 무기 장착 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
+	void OnEquipWeapon();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StartFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_StartFire();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_StartFire();
+
+	// 블루프린트에서 구현 가능한 발사 시작 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
+	void OnStartFire();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void StopFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_StopFire();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_StopFire();
+
+	// 블루프린트에서 구현 가능한 발사 정지 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
+	void OnStopFire();
 public:
 
 	// 플레이어 사망 처리
 	UFUNCTION(BlueprintCallable, Category = "Death")
 	void Die();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_Die();
+
+	// 블루프린트에서 구현 가능한 사망 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Death")
+	void OnDie();
+
+	// 구르기 관련 함수
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate = 0.8f);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayRollingAnimation(UAnimMontage* RollMontage, float PlayRate);
+
+	// 블루프린트에서 구현 가능한 구르기 이벤트
+	UFUNCTION(BlueprintImplementableEvent, Category = "Movement")
+	void OnRollingAnimation();
 
 protected:
 	// ADeathDropBox 클래스 사용을 위한 전방 선언
