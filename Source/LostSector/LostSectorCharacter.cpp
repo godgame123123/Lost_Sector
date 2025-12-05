@@ -98,6 +98,13 @@ void ALostSectorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 		{
 			EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ALostSectorCharacter::Reload);
 		}
+		// Fire - 블루프린트에서 처리하므로 C++ 바인딩 제거
+		// 블루프린트에서 Enhanced Input Action 노드를 사용하여 처리
+		// if (FireAction)
+		// {
+		// 	EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Started, this, &ALostSectorCharacter::StartFire);
+		// 	EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Completed, this, &ALostSectorCharacter::StopFire);
+		// }
 	}
 	else
 	{
@@ -638,6 +645,12 @@ void ALostSectorCharacter::EquipWeapon()
 
 			CurrentWeapon->SetInstigator(this);
 		}
+
+		// 모든 클라이언트에서 무기 장착 시각적 효과 재생
+		if (HasAuthority())
+		{
+			Multicast_EquipWeapon();
+		}
 	}
 }
 
@@ -736,10 +749,13 @@ void ALostSectorCharacter::Server_StartFire_Implementation()
 		FireDirection = GetActorForwardVector();
 	}
 
-	// 3. 발사 시도
+	// 3. 발사 시도 (무기 클래스의 Fire 함수가 멀티캐스트를 처리함)
 	CurrentWeapon->Fire(FireDirection);
 
-	// 4. 연사 타이머 설정 (타이머가 돌고 있지 않을 때만 설정)
+	// 4. 블루프린트 이벤트 호출 (추가 시각적 효과용)
+	Multicast_StartFire();
+
+	// 5. 연사 타이머 설정 (타이머가 돌고 있지 않을 때만 설정)
 	if (!GetWorldTimerManager().IsTimerActive(FireTimerHandle))
 	{
 		GetWorldTimerManager().SetTimer(
@@ -776,6 +792,9 @@ void ALostSectorCharacter::Server_StopFire_Implementation()
 	{
 		GetWorldTimerManager().ClearTimer(FireTimerHandle);
 	}
+
+	// 모든 클라이언트에서 발사 정지 이펙트/애니메이션 재생
+	Multicast_StopFire();
 }
 
 bool ALostSectorCharacter::Server_UpdateRotation_Validate(FRotator NewRotation)
@@ -1002,6 +1021,107 @@ void ALostSectorCharacter::Die()
 	// 4.액터 수명 설정
 	// 5초 후 캐릭터 Actor 자체를 월드에서 제거합니다. (아이템 상자는 별개로 존재)
 	SetLifeSpan(5.0f);
+
+	// 모든 클라이언트에서 사망 이펙트/애니메이션 재생
+	if (HasAuthority())
+	{
+		Multicast_Die();
+	}
+}
+
+// 멀티캐스트 함수 구현들
+void ALostSectorCharacter::Multicast_StartFire_Implementation()
+{
+	// 모든 클라이언트에서 발사 이펙트/애니메이션 재생
+	// 블루프린트에서 구현된 OnStartFire 이벤트 호출
+	OnStartFire();
+	
+	UE_LOG(LogTemp, Log, TEXT("Multicast_StartFire: %s"), *GetName());
+}
+
+void ALostSectorCharacter::Multicast_StopFire_Implementation()
+{
+	// 모든 클라이언트에서 발사 정지 이펙트/애니메이션 재생
+	// 블루프린트에서 구현된 OnStopFire 이벤트 호출
+	OnStopFire();
+	
+	UE_LOG(LogTemp, Log, TEXT("Multicast_StopFire: %s"), *GetName());
+}
+
+void ALostSectorCharacter::Multicast_EquipWeapon_Implementation()
+{
+	// 모든 클라이언트에서 무기 장착 시각적 효과 재생
+	// 블루프린트에서 구현된 OnEquipWeapon 이벤트 호출
+	OnEquipWeapon();
+	
+	UE_LOG(LogTemp, Log, TEXT("Multicast_EquipWeapon: %s"), *GetName());
+}
+
+void ALostSectorCharacter::Multicast_Die_Implementation()
+{
+	// 모든 클라이언트에서 사망 이펙트/애니메이션 재생
+	// 블루프린트에서 구현된 OnDie 이벤트 호출
+	OnDie();
+	
+	UE_LOG(LogTemp, Log, TEXT("Multicast_Die: %s"), *GetName());
+}
+
+// 구르기 관련 함수 구현
+void ALostSectorCharacter::PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate)
+{
+	if (GetLocalRole() < ROLE_Authority) // 클라이언트라면
+	{
+		Server_PlayRollAnimation(RollMontage, PlayRate); // 서버로 RPC 호출
+	}
+	else // 서버라면 (또는 싱글 플레이어)
+	{
+		Server_PlayRollAnimation(RollMontage, PlayRate); // 서버에서 직접 실행
+	}
+}
+
+bool ALostSectorCharacter::Server_PlayRollAnimation_Validate(UAnimMontage* RollMontage, float PlayRate)
+{
+	return RollMontage != nullptr && PlayRate > 0.0f;
+}
+
+void ALostSectorCharacter::Server_PlayRollAnimation_Implementation(UAnimMontage* RollMontage, float PlayRate)
+{
+	if (!RollMontage)
+	{
+		return;
+	}
+
+	// 구르기 상태 설정
+	Rolling = true;
+	
+	// 모든 클라이언트에서 애니메이션 재생 (파라미터 전달)
+	Multicast_PlayRollingAnimation(RollMontage, PlayRate);
+
+	// 구르기 종료 타이머 설정
+	GetWorldTimerManager().SetTimer(
+		RollingTimerHandle,
+		this,
+		&ALostSectorCharacter::OnRollingEnd,
+		RollingDuration,
+		false
+	);
+}
+
+void ALostSectorCharacter::Multicast_PlayRollingAnimation_Implementation(UAnimMontage* RollMontage, float PlayRate)
+{
+	if (RollMontage && GetMesh())
+	{
+		PlayAnimMontage(RollMontage, PlayRate);
+	}
+	
+	// 블루프린트에서 구현된 OnRollingAnimation 이벤트 호출
+	OnRollingAnimation();
+}
+
+void ALostSectorCharacter::OnRollingEnd()
+{
+	Rolling = false;
+	GetWorldTimerManager().ClearTimer(RollingTimerHandle);
 }
 
 void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -1012,4 +1132,5 @@ void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(ALostSectorCharacter, CharacterStats);
 	DOREPLIFETIME(ALostSectorCharacter, HeadPitch);
 	DOREPLIFETIME(ALostSectorCharacter, ReplicatedRotation);
+	DOREPLIFETIME(ALostSectorCharacter, Rolling);
 }

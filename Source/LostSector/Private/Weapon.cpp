@@ -261,43 +261,14 @@ void AWeapon::Fire(FVector Direction)
     bCanFire = false;
     CurrentAmmo--;
 
-    
-    APawn* OwnerPawn = Cast<APawn>(GetOwner());
-    if (OwnerPawn && FireAnimMontage) 
+    // 서버에서만 멀티캐스트 호출 (모든 클라이언트에서 애니메이션 재생)
+    if (HasAuthority())
     {
-        
-        USkeletalMeshComponent* CharacterMesh = OwnerPawn->FindComponentByClass<USkeletalMeshComponent>();
-
-        if (CharacterMesh)
-        {
-            UAnimInstance* AnimInstance = CharacterMesh->GetAnimInstance();
-
-            
-            if (AnimInstance)
-            {
-                AnimInstance->Montage_Play(FireAnimMontage, 1.0f);
-            }
-        }
+        Multicast_PlayFireAnimation();
     }
 
     
-    FVector StartLocation = MuzzleLocation->GetComponentLocation();
-
-    if (MuzzleLocation) 
-    {
-        if (MuzzleFlashFX)
-        {
-            UNiagaraFunctionLibrary::SpawnSystemAttached(
-                MuzzleFlashFX,                  
-                MuzzleLocation,                 
-                NAME_None,                      
-                FVector::ZeroVector,            
-                FRotator::ZeroRotator,         
-                EAttachLocation::SnapToTarget,  
-                true                            
-            );
-        }
-    }
+    FVector StartLocation = MuzzleLocation ? MuzzleLocation->GetComponentLocation() : GetActorLocation();
 
   
     FVector FinalFireDirection = Direction;
@@ -319,8 +290,15 @@ void AWeapon::Fire(FVector Direction)
         FinalFireDirection = UKismetMathLibrary::GetForwardVector(SpreadRotator);
     }
   
-
-    PerformLineTrace(StartLocation, FinalFireDirection); 
+  
+    // 서버에서만 데미지 처리 및 라인 트레이스 실행
+    if (HasAuthority())
+    {
+        PerformLineTrace(StartLocation, FinalFireDirection);
+        
+        // 이펙트를 모든 클라이언트에서 재생
+        Multicast_PlayFireEffects(StartLocation, FinalFireDirection);
+    }
 
     OnFireEvent();
 
@@ -441,4 +419,87 @@ void AWeapon::FinishReload()
 
     // ������ �߿��� �߻簡 ���� �־����Ƿ�, Ȥ�� �� ��Ȳ�� ����� Fire ���¸� �缳���մϴ�.
     ResetFire();
+}
+
+void AWeapon::Multicast_PlayFireAnimation_Implementation()
+{
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    if (OwnerPawn && FireAnimMontage) 
+    {
+        USkeletalMeshComponent* CharacterMesh = OwnerPawn->FindComponentByClass<USkeletalMeshComponent>();
+
+        if (CharacterMesh)
+        {
+            UAnimInstance* AnimInstance = CharacterMesh->GetAnimInstance();
+
+            if (AnimInstance)
+            {
+                AnimInstance->Montage_Play(FireAnimMontage, 1.0f);
+            }
+        }
+    }
+}
+
+void AWeapon::Multicast_PlayFireEffects_Implementation(FVector StartLocation, FVector Direction)
+{
+    // 머즐 플래시 이펙트 재생
+    if (MuzzleLocation && MuzzleFlashFX)
+    {
+        UNiagaraFunctionLibrary::SpawnSystemAttached(
+            MuzzleFlashFX,                  
+            MuzzleLocation,                 
+            NAME_None,                      
+            FVector::ZeroVector,            
+            FRotator::ZeroRotator,         
+            EAttachLocation::SnapToTarget,  
+            true                            
+        );
+    }
+
+    // 트레이서 생성 (시각적 효과만, 데미지는 서버에서 처리)
+    if (TracerActorClass)
+    {
+        // 트레이서의 목표 위치 계산 (최대 사거리까지)
+        FVector EndLocation = StartLocation + (Direction * MaxRange);
+        
+        // 간단한 라인 트레이스로 목표 위치 찾기 (시각적 효과용)
+        FHitResult HitResult;
+        FCollisionQueryParams Params;
+        Params.AddIgnoredActor(this);
+        if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+        {
+            Params.AddIgnoredActor(OwnerPawn);
+        }
+
+        bool bHit = GetWorld()->LineTraceSingleByChannel(
+            HitResult,
+            StartLocation,
+            EndLocation,
+            ECollisionChannel::ECC_Visibility,
+            Params
+        );
+
+        FVector TargetLocation = bHit ? HitResult.Location : EndLocation;
+
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+        {
+            SpawnParams.Instigator = OwnerPawn;
+        }
+
+        // 트레이서 액터 생성
+        AATracer* TracerActor = GetWorld()->SpawnActor<AATracer>(
+            TracerActorClass,
+            StartLocation,
+            Direction.Rotation(),
+            SpawnParams
+        );
+
+        if (TracerActor)
+        {
+            const float BulletSpeed = 20000.0f;
+            TracerActor->StartMoving(TargetLocation, BulletSpeed);
+        }
+    }
 }
