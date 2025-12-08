@@ -12,6 +12,7 @@
 #include "Animation/AnimInstance.h"
 #include "InventoryComponent.h"
 #include "../LostSectorCharacter.h"
+#include "Perception/AIPerceptionSystem.h"
 
 AWeapon::AWeapon()
 {
@@ -151,20 +152,6 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
         );
     }
 
-    //FColor LineColor = bHit ? FColor::Red : FColor::Green;
-
-    // DrawDebugLine �Լ��� Kismet/KismetMathLibrary.h �� ���ǵǾ� �ֽ��ϴ�.
-    // ���� �ڵ忡�� #include "Kismet/KismetMathLibrary.h" �� ���ԵǾ� �����Ƿ� �ٷ� ��� �����մϴ�.
-    //DrawDebugLine(
-    //    GetWorld(),
-    //    Start,
-    //    bHit ? HitResult.Location : End, // ��Ʈ������ ��Ʈ ��������, �ƴϸ� �ִ� ��Ÿ�����
-    //    LineColor,
-    //    false,      // bPersistentLines (���������� ����)
-    //    5.0f,       // LifeTime (5�ʰ� ǥ��)
-    //    0,          // DepthPriority
-    //    3.0f        // Thickness (���� �β�)
-    //);
 
     if (bHit)
     {
@@ -270,6 +257,14 @@ void AWeapon::Fire(FVector Direction)
     
     FVector StartLocation = MuzzleLocation ? MuzzleLocation->GetComponentLocation() : GetActorLocation();
 
+    if (FireSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            GetWorld(),
+            FireSound,
+            StartLocation
+        );
+    }
   
     FVector FinalFireDirection = Direction;
 
@@ -364,6 +359,15 @@ void AWeapon::WeaponReload()
 
     bIsReloading = true; // ������ �÷��� ����
     bCanFire = false;    // ������ �� �߻� ���� (Fire �Լ����� üũ)
+
+    if (ReloadSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            GetWorld(),
+            ReloadSound,
+            GetActorLocation()
+        );
+    }
 
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
