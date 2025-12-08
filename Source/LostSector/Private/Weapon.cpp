@@ -357,8 +357,8 @@ void AWeapon::WeaponReload()
 
     UE_LOG(LogTemp, Log, TEXT("%s: Starting reload for %f seconds..."), *GetName(), ReloadDuration);
 
-    bIsReloading = true; // ������ �÷��� ����
-    bCanFire = false;    // ������ �� �߻� ���� (Fire �Լ����� üũ)
+    bIsReloading = true; 
+    bCanFire = false;    
 
     if (ReloadSound)
     {
@@ -368,6 +368,8 @@ void AWeapon::WeaponReload()
             GetActorLocation()
         );
     }
+    
+    OnReloadEvent();
 
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
