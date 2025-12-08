@@ -120,6 +120,13 @@ protected:
     virtual void BeginPlay() override;
     void ResetFire();
 
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    class USoundBase* FireSound;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Sound")
+    class USoundBase* ReloadSound;
+
+    
 private:
     void PerformLineTrace(FVector Start, FVector Direction);
 };

@@ -21,6 +21,7 @@
 #include "Net/UnrealNetwork.h"
 #include "DeathDropBox.h"
 
+
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
 
 // ALostSectorCharacter
