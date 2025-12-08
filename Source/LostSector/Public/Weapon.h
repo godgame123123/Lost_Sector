@@ -93,6 +93,9 @@ public:
     UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
     void OnFireEvent();
 
+    UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
+    void OnReloadEvent();
+
     UFUNCTION(BlueprintCallable, Category = "Combat")
     void WeaponReload();
 
@@ -116,6 +119,9 @@ protected:
     
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
     float SpreadResetDuration = 0.2f; 
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
+    float ReloadNoiseRange = 1500.0f;
 
     virtual void BeginPlay() override;
     void ResetFire();
