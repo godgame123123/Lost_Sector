@@ -135,7 +135,7 @@ public:
 	void StartFire();
 
 	UFUNCTION(Server, Reliable, WithValidation)
-	void Server_StartFire();
+	void Server_StartFire(FVector ClientTargetLocation = FVector::ZeroVector);
 
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_StartFire();
