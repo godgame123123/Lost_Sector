@@ -171,7 +171,15 @@ public:
 
 	// 구르기 관련 함수
 	UFUNCTION(BlueprintCallable, Category = "Movement")
-	void PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate = 0.8f);
+	void PlayRollAnimation(UAnimMontage* RollMontage = nullptr, float PlayRate = 0.0f);
+	
+	// 파라미터 없이 호출 가능한 구르기 함수 (블루프린트 편의용)
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void PlayRoll();
+
+	// 구르기 상태 강제 리셋 (디버그/복구용)
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void ResetRollingState();
 
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate);
@@ -182,6 +190,14 @@ public:
 	// 블루프린트에서 구현 가능한 구르기 이벤트
 	UFUNCTION(BlueprintImplementableEvent, Category = "Movement")
 	void OnRollingAnimation();
+
+	// 블루프린트에서 구현 가능한 구르기 시작 이벤트 (구르기 시 총소기 해제용)
+	UFUNCTION(BlueprintImplementableEvent, Category = "Movement")
+	void OnRollingStart();
+
+	// 블루프린트에서 구현 가능한 구르기 종료 이벤트 (구르기 종료 시 총소기 복원용)
+	UFUNCTION(BlueprintImplementableEvent, Category = "Movement")
+	void OnRollingFinished();
 
 protected:
 	// ADeathDropBox 클래스 사용을 위한 전방 선언
