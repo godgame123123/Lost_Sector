@@ -657,6 +657,20 @@ void ALostSectorCharacter::EquipWeapon()
 
 void ALostSectorCharacter::StartFire()
 {
+	// 구르기 중이면 발사 불가 (클라이언트/서버 모두 체크)
+	// 서버 플레이어의 경우에도 동일하게 작동하도록 강제 체크
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, VeryVerbose, TEXT("StartFire: Blocked - Character is rolling (Role: %d)"), (int32)GetLocalRole());
+		// 발사 타이머가 돌고 있으면 즉시 중지
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+			UE_LOG(LogTemp, Log, TEXT("StartFire: Cleared fire timer due to rolling."));
+		}
+		return;
+	}
+
 	// 클라이언트에서 서버로 RPC 호출
 	if (GetLocalRole() < ROLE_Authority)
 	{
@@ -664,17 +678,38 @@ void ALostSectorCharacter::StartFire()
 		return;
 	}
 
-	// 서버에서 실제 발사 로직 실행
+	// 서버에서 실제 발사 로직 실행 (서버 플레이어의 경우)
+	// 서버 플레이어도 동일한 검증을 거치도록 Server_StartFire 호출
 	Server_StartFire();
 }
 
 bool ALostSectorCharacter::Server_StartFire_Validate()
 {
+	// 구르기 중이면 검증 실패
+	if (Rolling)
+	{
+		return false;
+	}
 	return true;
 }
 
 void ALostSectorCharacter::Server_StartFire_Implementation()
 {
+	// 구르기 중이면 완전히 차단 (최우선 체크)
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_StartFire: Blocked - Character is rolling. Clearing any active fire timer."));
+		// 발사 타이머가 돌고 있으면 즉시 중지
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		}
+		// 발사 정지 상태 확보
+		Server_StopFire();
+		return;
+	}
+
+	// 스프린트 중이거나 무기가 없으면 발사 불가
 	if (bIsSprinting || !CurrentWeapon)
 	{
 		return;
@@ -750,6 +785,18 @@ void ALostSectorCharacter::Server_StartFire_Implementation()
 		FireDirection = GetActorForwardVector();
 	}
 
+	// 발사 전에 다시 한 번 구르기 상태 체크 (타이머 콜백에서 호출될 수 있으므로)
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, VeryVerbose, TEXT("Server_StartFire: Blocked - Character started rolling during fire sequence."));
+		// 발사 타이머가 돌고 있으면 즉시 중지
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		}
+		return;
+	}
+
 	// 3. 발사 시도 (무기 클래스의 Fire 함수가 멀티캐스트를 처리함)
 	CurrentWeapon->Fire(FireDirection);
 
@@ -757,7 +804,8 @@ void ALostSectorCharacter::Server_StartFire_Implementation()
 	Multicast_StartFire();
 
 	// 5. 연사 타이머 설정 (타이머가 돌고 있지 않을 때만 설정)
-	if (!GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	// 구르기 중이 아닐 때만 타이머 설정
+	if (!Rolling && !GetWorldTimerManager().IsTimerActive(FireTimerHandle))
 	{
 		GetWorldTimerManager().SetTimer(
 			FireTimerHandle,
@@ -766,6 +814,15 @@ void ALostSectorCharacter::Server_StartFire_Implementation()
 			CurrentWeapon->FireRate,
 			true
 		);
+	}
+	else if (Rolling)
+	{
+		// 구르기 중이면 타이머가 설정되지 않도록 보장
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+			UE_LOG(LogTemp, Warning, TEXT("Server_StartFire: Cleared fire timer because character is rolling."));
+		}
 	}
 }
 
@@ -811,6 +868,12 @@ void ALostSectorCharacter::Server_UpdateRotation_Implementation(FRotator NewRota
 
 void ALostSectorCharacter::Move(const FInputActionValue& Value)
 {
+	// 구르기 중이면 이동 입력 무시
+	if (Rolling)
+	{
+		return;
+	}
+
 	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
@@ -847,6 +910,13 @@ void ALostSectorCharacter::Look(const FInputActionValue& Value)
 
 void ALostSectorCharacter::Reload(const FInputActionValue& Value)
 {
+	// 구르기 중이면 재장전 불가
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Cannot reload: Character is rolling."));
+		return;
+	}
+
 	if (CurrentWeapon)
 	{
 		UE_LOG(LogTemp, Log, TEXT("Reload key pressed. Calling WeaponReload on %s"), *CurrentWeapon->GetName());
@@ -1070,8 +1140,68 @@ void ALostSectorCharacter::Multicast_Die_Implementation()
 // 구르기 관련 함수 구현
 void ALostSectorCharacter::PlayRollAnimation(UAnimMontage* RollMontage, float PlayRate)
 {
-	if (GetLocalRole() < ROLE_Authority) // 클라이언트라면
+	// 사망 상태면 구르기 불가
+	if (bIsDead)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("PlayRollAnimation: Character is dead, cannot roll."));
+		return;
+	}
+
+	// 이미 구르기 중이면 완전히 차단 (스페이스바 입력 무시)
+	if (Rolling)
+	{
+		// 타이머가 활성화되어 있는지 확인 (타이머가 없으면 상태 오류일 수 있음)
+		if (!GetWorldTimerManager().IsTimerActive(RollingTimerHandle))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PlayRollAnimation: Rolling is true but timer is not active! Resetting state."));
+			Rolling = false;
+			// 상태를 리셋했으므로 계속 진행
+		}
+		else
+		{
+			// 구르기 중이므로 완전히 차단
+			UE_LOG(LogTemp, VeryVerbose, TEXT("PlayRollAnimation: Already rolling, completely blocking input."));
+			return;
+		}
+	}
+
+	// 스태미나 체크
+	if (CharacterStats.Stamina < RollingStaminaCost)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PlayRollAnimation: Not enough stamina. Required: %f, Current: %f"), 
+			RollingStaminaCost, CharacterStats.Stamina);
+		return;
+	}
+
+	// 파라미터가 없으면 클래스 변수 사용
+	if (!RollMontage)
+	{
+		RollMontage = RollingAnimMontage;
+	}
+
+	if (!RollMontage)
+	{
+		UE_LOG(LogTemp, Error, TEXT("PlayRollAnimation: No RollMontage specified! Set RollingAnimMontage in Blueprint."));
+		return;
+	}
+
+	// PlayRate가 0 이하면 클래스 변수 사용
+	if (PlayRate <= 0.0f)
+	{
+		PlayRate = RollingAnimPlayRate;
+	}
+
+	// 클라이언트에서 중복 호출 방지
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		// 이미 구르기 중이면 서버로 RPC를 보내지 않음
+		// (네트워크 복제 지연으로 인한 중복 방지를 위해 로컬 상태도 확인)
+		if (Rolling)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PlayRollAnimation: Client already rolling, preventing duplicate RPC."));
+			return;
+		}
+		
 		Server_PlayRollAnimation(RollMontage, PlayRate); // 서버로 RPC 호출
 	}
 	else // 서버라면 (또는 싱글 플레이어)
@@ -1082,6 +1212,12 @@ void ALostSectorCharacter::PlayRollAnimation(UAnimMontage* RollMontage, float Pl
 
 bool ALostSectorCharacter::Server_PlayRollAnimation_Validate(UAnimMontage* RollMontage, float PlayRate)
 {
+	// 구르기 중이면 검증 실패
+	if (Rolling)
+	{
+		return false;
+	}
+	
 	return RollMontage != nullptr && PlayRate > 0.0f;
 }
 
@@ -1089,11 +1225,47 @@ void ALostSectorCharacter::Server_PlayRollAnimation_Implementation(UAnimMontage*
 {
 	if (!RollMontage)
 	{
+		UE_LOG(LogTemp, Error, TEXT("Server_PlayRollAnimation: RollMontage is null!"));
 		return;
 	}
 
-	// 구르기 상태 설정
+	// 이미 구르기 중이면 중복 실행 방지
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_PlayRollAnimation: Already rolling, ignoring request."));
+		return;
+	}
+
+	// 스태미나 소비
+	if (!ConsumeStamina(RollingStaminaCost))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_PlayRollAnimation: Failed to consume stamina."));
+		return;
+	}
+
+	// 구르기 상태를 먼저 설정 (발사 체크가 즉시 작동하도록)
 	Rolling = true;
+	
+	// 구르기 시작 시 발사 완전히 중지 (구르기 중 총쏘기 방지)
+	// 1. 발사 타이머 즉시 중지
+	if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		UE_LOG(LogTemp, Log, TEXT("Server_PlayRollAnimation: Stopped fire timer for rolling."));
+	}
+	
+	// 2. 발사 정지 RPC 호출 (모든 클라이언트에서 발사 정지)
+	Server_StopFire();
+	
+	// 3. 추가 안전장치: 발사가 진행 중이면 즉시 중지
+	// (서버 플레이어의 경우 직접 호출될 수 있으므로)
+	if (HasAuthority() && GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		UE_LOG(LogTemp, Warning, TEXT("Server_PlayRollAnimation: Force cleared fire timer (server player)."));
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("Server_PlayRollAnimation: Starting roll animation. Stamina remaining: %f"), CharacterStats.Stamina);
 	
 	// 모든 클라이언트에서 애니메이션 재생 (파라미터 전달)
 	Multicast_PlayRollingAnimation(RollMontage, PlayRate);
@@ -1110,19 +1282,87 @@ void ALostSectorCharacter::Server_PlayRollAnimation_Implementation(UAnimMontage*
 
 void ALostSectorCharacter::Multicast_PlayRollingAnimation_Implementation(UAnimMontage* RollMontage, float PlayRate)
 {
+	bool bAnimationPlayed = false;
+	
 	if (RollMontage && GetMesh())
 	{
-		PlayAnimMontage(RollMontage, PlayRate);
+		float MontageLength = PlayAnimMontage(RollMontage, PlayRate);
+		if (MontageLength > 0.0f)
+		{
+			bAnimationPlayed = true;
+			UE_LOG(LogTemp, Log, TEXT("Multicast_PlayRollingAnimation: Playing roll animation. Length: %f"), MontageLength);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Multicast_PlayRollingAnimation: Failed to play animation montage!"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Multicast_PlayRollingAnimation: Cannot play animation - RollMontage: %s, Mesh: %s"), 
+			RollMontage ? TEXT("Valid") : TEXT("Null"), GetMesh() ? TEXT("Valid") : TEXT("Null"));
+	}
+	
+	// 애니메이션 재생 실패 시 서버에서 상태 복구
+	if (!bAnimationPlayed && HasAuthority())
+	{
+		UE_LOG(LogTemp, Error, TEXT("Multicast_PlayRollingAnimation: Animation failed to play, resetting roll state."));
+		Rolling = false;
+		// 스태미나 복구 (선택적 - 실패 시 복구할지 결정)
+		// CharacterStats.Stamina += RollingStaminaCost;
+		// CharacterStats.Stamina = FMath::Clamp(CharacterStats.Stamina, 0.0f, 100.0f);
+		return;
 	}
 	
 	// 블루프린트에서 구현된 OnRollingAnimation 이벤트 호출
 	OnRollingAnimation();
+	
+	// 구르기 시작 시 총소기 해제를 위한 이벤트 호출
+	OnRollingStart();
+}
+
+void ALostSectorCharacter::PlayRoll()
+{
+	// 구르기 중이면 완전히 차단
+	if (Rolling)
+	{
+		return;
+	}
+
+	// 클래스 변수를 사용하여 구르기 실행
+	PlayRollAnimation(RollingAnimMontage, RollingAnimPlayRate);
+}
+
+void ALostSectorCharacter::ResetRollingState()
+{
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ResetRollingState: Forcing roll state to false."));
+		Rolling = false;
+		GetWorldTimerManager().ClearTimer(RollingTimerHandle);
+	}
 }
 
 void ALostSectorCharacter::OnRollingEnd()
 {
 	Rolling = false;
 	GetWorldTimerManager().ClearTimer(RollingTimerHandle);
+	
+	UE_LOG(LogTemp, Log, TEXT("OnRollingEnd: Roll finished."));
+	
+	// 구르기 종료 시 발사 타이머가 돌고 있으면 중지
+	// (구르기 중에 발사 요청이 들어와서 큐에 쌓였을 수 있음)
+	if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+	{
+		GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		UE_LOG(LogTemp, Log, TEXT("OnRollingEnd: Cleared fire timer that was active after rolling."));
+	}
+	
+	// 발사 정지 상태 확보 (구르기 종료 후 자동 발사 방지)
+	Server_StopFire();
+	
+	// 구르기 종료 시 총소기 복원을 위한 이벤트 호출
+	OnRollingFinished();
 }
 
 void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
