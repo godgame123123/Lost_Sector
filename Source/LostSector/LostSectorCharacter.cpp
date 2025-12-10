@@ -671,19 +671,79 @@ void ALostSectorCharacter::StartFire()
 		return;
 	}
 
-	// 클라이언트에서 서버로 RPC 호출
+	// 클라이언트에서 서버로 RPC 호출 (타겟 위치 계산 후 전달)
 	if (GetLocalRole() < ROLE_Authority)
 	{
-		Server_StartFire();
+		FVector TargetLocation = FVector::ZeroVector;
+		
+		// 클라이언트에서 타겟 위치 계산
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			FVector WorldLocation, WorldDirection;
+			if (PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+			{
+				// 라인 트레이스 실행
+				FHitResult HitResult;
+				FVector StartTrace = WorldLocation;
+				FVector EndTrace = WorldLocation + WorldDirection * (CurrentWeapon ? CurrentWeapon->MaxRange : 5000.0f);
+
+				FCollisionQueryParams Params;
+				Params.AddIgnoredActor(this);
+
+				if (GetWorld()->LineTraceSingleByChannel(
+					HitResult,
+					StartTrace,
+					EndTrace,
+					ECollisionChannel::ECC_Visibility,
+					Params))
+				{
+					TargetLocation = HitResult.Location;
+				}
+				else
+				{
+					TargetLocation = EndTrace;
+				}
+			}
+		}
+		
+		Server_StartFire(TargetLocation);
 		return;
 	}
 
-	// 서버에서 실제 발사 로직 실행 (서버 플레이어의 경우)
-	// 서버 플레이어도 동일한 검증을 거치도록 Server_StartFire 호출
-	Server_StartFire();
+	// 서버 플레이어의 경우 타겟 위치를 직접 계산
+	FVector TargetLocation = FVector::ZeroVector;
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		FVector WorldLocation, WorldDirection;
+		if (PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+		{
+			FHitResult HitResult;
+			FVector StartTrace = WorldLocation;
+			FVector EndTrace = WorldLocation + WorldDirection * (CurrentWeapon ? CurrentWeapon->MaxRange : 5000.0f);
+
+			FCollisionQueryParams Params;
+			Params.AddIgnoredActor(this);
+
+			if (GetWorld()->LineTraceSingleByChannel(
+				HitResult,
+				StartTrace,
+				EndTrace,
+				ECollisionChannel::ECC_Visibility,
+				Params))
+			{
+				TargetLocation = HitResult.Location;
+			}
+			else
+			{
+				TargetLocation = EndTrace;
+			}
+		}
+	}
+	
+	Server_StartFire(TargetLocation);
 }
 
-bool ALostSectorCharacter::Server_StartFire_Validate()
+bool ALostSectorCharacter::Server_StartFire_Validate(FVector ClientTargetLocation)
 {
 	// 구르기 중이면 검증 실패
 	if (Rolling)
@@ -693,7 +753,7 @@ bool ALostSectorCharacter::Server_StartFire_Validate()
 	return true;
 }
 
-void ALostSectorCharacter::Server_StartFire_Implementation()
+void ALostSectorCharacter::Server_StartFire_Implementation(FVector ClientTargetLocation)
 {
 	// 구르기 중이면 완전히 차단 (최우선 체크)
 	if (Rolling)
@@ -733,33 +793,39 @@ void ALostSectorCharacter::Server_StartFire_Implementation()
 	// 1. 플레이어 컨트롤러 조준 로직
 	if (CurrentController->IsPlayerController())
 	{
-		APlayerController* PC = CastChecked<APlayerController>(CurrentController); // 캐스팅 체크는 안정성을 높입니다.
-
-		// 1. 마우스 위치를 월드 좌표로 변환합니다.
-		FVector WorldLocation, WorldDirection;
-		if (!PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+	// 클라이언트에서 전달받은 타겟 위치 사용 (클라이언트 플레이어의 경우)
+		
+		// 또는 서버 플레이어의 경우 직접 계산
+		if (ClientTargetLocation != FVector::ZeroVector)
 		{
-			return; // 디프로젝트 실패 시 종료
+			// 클라이언트에서 전달받은 타겟 위치 사용
+			TargetLocation = ClientTargetLocation;
 		}
+		else
+		{
+			// 서버 플레이어의 경우 직접 계산
+			APlayerController* PC = CastChecked<APlayerController>(CurrentController);
+			FVector WorldLocation, WorldDirection;
+			if (PC->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+			{
+				FHitResult HitResult;
+				FVector StartTrace = WorldLocation;
+				FVector EndTrace = WorldLocation + WorldDirection * CurrentWeapon->MaxRange;
 
-		// 2. 라인 트레이스 실행
-		FHitResult HitResult;
-		FVector StartTrace = WorldLocation;
-		FVector EndTrace = WorldLocation + WorldDirection * CurrentWeapon->MaxRange;
+				FCollisionQueryParams Params;
+				Params.AddIgnoredActor(this);
 
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
+				bool bHit = GetWorld()->LineTraceSingleByChannel(
+					HitResult,
+					StartTrace,
+					EndTrace,
+					ECollisionChannel::ECC_Visibility,
+					Params
+				);
 
-		bool bHit = GetWorld()->LineTraceSingleByChannel(
-			HitResult,
-			StartTrace,
-			EndTrace,
-			ECollisionChannel::ECC_Visibility,
-			Params
-		);
-
-		// 5. TargetLocation 결정
-		TargetLocation = bHit ? HitResult.Location : EndTrace;
+				TargetLocation = bHit ? HitResult.Location : EndTrace;
+			}
+		}
 	}
 	// 2. AI 컨트롤러 조준 로직
 	else if (CurrentController->IsA<AAIController>())
