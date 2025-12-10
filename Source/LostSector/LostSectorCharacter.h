@@ -63,11 +63,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Stats|Movement")
 	bool ConsumeStamina(float StaminaCost);
 public:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stamina")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Stamina", ReplicatedUsing = OnRep_IsSprinting)
 	bool bIsSprinting = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float SprintSpeed = 800.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float WalkSpeed = 500.0f;
 
 	UFUNCTION(BlueprintCallable, Category = "Stamina")
 	void SetIsSprinting(bool bNewState);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_SetIsSprinting(bool bNewState);
+
+	UFUNCTION()
+	void OnRep_IsSprinting();
 	
 private:
 	FTimerHandle StaminaTimerHandle;
@@ -214,6 +226,12 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 	void Reload(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable, WithValidation)
+	void Server_Reload();
+
+	bool Server_Reload_Validate();
+	void Server_Reload_Implementation();
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

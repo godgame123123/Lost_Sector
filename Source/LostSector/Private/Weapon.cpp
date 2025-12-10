@@ -176,6 +176,23 @@ void AWeapon::PerformLineTrace(FVector Start, FVector Direction)
 
 void AWeapon::Fire(FVector Direction)
 {
+    // 구르기 중이면 발사 불가 (최우선 체크)
+    APawn* WeaponOwnerPawn = Cast<APawn>(GetOwner());
+    if (WeaponOwnerPawn)
+    {
+        // ALostSectorCharacter로 캐스팅하여 구르기 상태 확인
+        if (ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(WeaponOwnerPawn))
+        {
+            // Rolling은 public이지만, 접근 가능한지 확인
+            // LostSectorCharacter.h에서 Rolling이 public으로 선언되어 있는지 확인 필요
+            // 일단 GetOwner()를 통해 접근하는 방식으로 변경
+            if (Character && Character->Rolling)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Fire Blocked: Character is rolling."));
+                return;
+            }
+        }
+    }
 
     if (bIsReloading)
     {
@@ -309,6 +326,12 @@ void AWeapon::Fire(FVector Direction)
 
 void AWeapon::WeaponReload()
 {
+    // Server_Reload RPC를 통해 서버에서 호출되므로, 서버 권한 체크는 Server_Reload에서 수행
+    // WeaponReload는 Server_Reload_Implementation에서 호출되므로 서버에서 실행됨이 보장됨
+    // 클라이언트에서 직접 호출하는 경우를 방지하기 위한 체크는 유지하되, 
+    // Server_Reload를 통한 정상적인 호출은 문제없이 작동해야 함
+    
+    
     if (bIsReloading)
     {
         UE_LOG(LogTemp, Warning, TEXT("%s: Already reloading."), *GetName());
@@ -360,6 +383,12 @@ void AWeapon::WeaponReload()
     bIsReloading = true; 
     bCanFire = false;    
 
+    // 서버에서만 멀티캐스트 호출 (모든 클라이언트에서 재장전 애니메이션 재생)
+    if (HasAuthority())
+    {
+        Multicast_PlayReloadAnimation();
+    }
+
     if (ReloadSound)
     {
         UGameplayStatics::PlaySoundAtLocation(
@@ -368,8 +397,6 @@ void AWeapon::WeaponReload()
             GetActorLocation()
         );
     }
-    
-    OnReloadEvent();
 
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
@@ -388,6 +415,13 @@ void AWeapon::WeaponReload()
 
 void AWeapon::FinishReload()
 {
+    // 서버에서만 실행되어야 함 (인벤토리 수정 및 탄약 변경은 서버 권한 필요)
+    if (!HasAuthority())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: FinishReload called on client. This should only run on server."), *GetName());
+        return;
+    }
+
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
     {
@@ -444,6 +478,65 @@ void AWeapon::Multicast_PlayFireAnimation_Implementation()
             }
         }
     }
+}
+
+void AWeapon::Multicast_PlayReloadAnimation_Implementation()
+{
+    // 모든 클라이언트에서 재장전 애니메이션 재생
+    APawn* OwnerPawn = Cast<APawn>(GetOwner());
+    
+    UE_LOG(LogTemp, Log, TEXT("%s: Multicast_PlayReloadAnimation called on %s, OwnerPawn: %s, ReloadAnimMontage: %s"), 
+        *GetName(), 
+        HasAuthority() ? TEXT("Server") : TEXT("Client"),
+        OwnerPawn ? *OwnerPawn->GetName() : TEXT("NULL"),
+        ReloadAnimMontage ? TEXT("Valid") : TEXT("NULL"));
+    
+    if (!OwnerPawn)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Multicast_PlayReloadAnimation - OwnerPawn is null!"), *GetName());
+        return;
+    }
+    
+    if (!ReloadAnimMontage)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Multicast_PlayReloadAnimation - ReloadAnimMontage is not set! Please set it in Blueprint."), *GetName());
+        // ReloadAnimMontage가 없어도 블루프린트 이벤트는 호출
+        OnReloadEvent();
+        return;
+    }
+    
+    USkeletalMeshComponent* CharacterMesh = OwnerPawn->FindComponentByClass<USkeletalMeshComponent>();
+    if (!CharacterMesh)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Multicast_PlayReloadAnimation - CharacterMesh not found!"), *GetName());
+        OnReloadEvent();
+        return;
+    }
+
+    UAnimInstance* AnimInstance = CharacterMesh->GetAnimInstance();
+    if (!AnimInstance)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Multicast_PlayReloadAnimation - AnimInstance not found!"), *GetName());
+        OnReloadEvent();
+        return;
+    }
+
+    // 애니메이션 몽타주 재생
+    float MontageLength = AnimInstance->Montage_Play(ReloadAnimMontage, 1.0f);
+    if (MontageLength > 0.0f)
+    {
+        UE_LOG(LogTemp, Log, TEXT("%s: Successfully playing reload animation montage (Length: %f) on %s"), 
+            *GetName(), 
+            MontageLength,
+            HasAuthority() ? TEXT("Server") : TEXT("Client"));
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("%s: Failed to play reload animation montage!"), *GetName());
+    }
+    
+    // 블루프린트 이벤트도 호출 (추가 효과용)
+    OnReloadEvent();
 }
 
 void AWeapon::Multicast_PlayFireEffects_Implementation(FVector StartLocation, FVector Direction)

@@ -48,6 +48,10 @@ ALostSectorCharacter::ALostSectorCharacter()
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
+	// 스프린트 속도 설정
+	SprintSpeed = 800.0f;
+	WalkSpeed = 500.0f;
+
 	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -247,17 +251,20 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 			}
 		}
 	}
+	// 스프린트 중 회전 설정
 	if (bIsSprinting)
 	{
+		// 스프린트 중에는 이동 방향으로 자동 회전
 		if (MovementComp && !MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = true;
 		}
-
+		// 스프린트 중에는 마우스 방향 회전 로직을 실행하지 않음 (이동 방향으로 자동 회전)
 		return;
 	}
 	else 
 	{
+		// 걷기 중에는 마우스 방향으로 회전
 		if (MovementComp && MovementComp->bOrientRotationToMovement)
 		{
 			MovementComp->bOrientRotationToMovement = false;
@@ -487,11 +494,58 @@ bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 }
 void ALostSectorCharacter::SetIsSprinting(bool bNewState)
 {
+	// 클라이언트에서 서버로 RPC 호출
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		Server_SetIsSprinting(bNewState);
+		return;
+	}
+
+	// 서버에서 실제 로직 실행
+	Server_SetIsSprinting(bNewState);
+}
+
+bool ALostSectorCharacter::Server_SetIsSprinting_Validate(bool bNewState)
+{
+	return true;
+}
+
+void ALostSectorCharacter::Server_SetIsSprinting_Implementation(bool bNewState)
+{
 	if (bIsSprinting == true && bNewState == false)
 	{
 		LastSprintEndTime = GetWorld()->GetTimeSeconds();
+		// 스프린트 종료 시 걷기 속도로 복원
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+		}
+	}
+	else if (bIsSprinting == false && bNewState == true)
+	{
+		// 스프린트 시작 시 속도 증가
+		if (GetCharacterMovement())
+		{
+			GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+		}
 	}
 	bIsSprinting = bNewState;
+}
+
+void ALostSectorCharacter::OnRep_IsSprinting()
+{
+	// 클라이언트에서 복제된 값에 따라 속도 업데이트
+	if (GetCharacterMovement())
+	{
+		if (bIsSprinting)
+		{
+			GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+		}
+		else
+		{
+			GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+		}
+	}
 }
 void ALostSectorCharacter::StaminaRegenDrainTick()
 {
@@ -536,11 +590,8 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 	{
 		if (bIsSprinting)
 		{
-			if (GetCharacterMovement())
-			{
-				GetCharacterMovement()->MaxWalkSpeed = 500.0f;
-			}
-			bIsSprinting = false;
+			// SetIsSprinting을 호출하여 서버로 RPC 전송 및 복제
+			SetIsSprinting(false);
 		}
 		if (LastStaminaZeroTime == 0.0f)
 		{
@@ -657,8 +708,8 @@ void ALostSectorCharacter::EquipWeapon()
 
 void ALostSectorCharacter::StartFire()
 {
-	// 구르기 중이면 발사 불가 (클라이언트/서버 모두 체크)
-	// 서버 플레이어의 경우에도 동일하게 작동하도록 강제 체크
+	// 구르기 중이면 발사 불가 (최우선 체크 - 클라이언트/서버 모두)
+	// 네트워크 복제 지연을 고려하여 로컬에서도 즉시 차단
 	if (Rolling)
 	{
 		UE_LOG(LogTemp, VeryVerbose, TEXT("StartFire: Blocked - Character is rolling (Role: %d)"), (int32)GetLocalRole());
@@ -668,12 +719,20 @@ void ALostSectorCharacter::StartFire()
 			GetWorldTimerManager().ClearTimer(FireTimerHandle);
 			UE_LOG(LogTemp, Log, TEXT("StartFire: Cleared fire timer due to rolling."));
 		}
+		// 클라이언트에서도 서버로 RPC를 보내지 않도록 완전히 차단
 		return;
 	}
 
 	// 클라이언트에서 서버로 RPC 호출 (타겟 위치 계산 후 전달)
 	if (GetLocalRole() < ROLE_Authority)
 	{
+		// 다시 한 번 구르기 체크 (네트워크 복제 지연 대비)
+		if (Rolling)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("StartFire: Blocked on client - Character started rolling before RPC."));
+			return;
+		}
+
 		FVector TargetLocation = FVector::ZeroVector;
 		
 		// 클라이언트에서 타겟 위치 계산
@@ -706,11 +765,30 @@ void ALostSectorCharacter::StartFire()
 			}
 		}
 		
-		Server_StartFire(TargetLocation);
+		// 마지막 체크: RPC 전송 직전에 다시 한 번 구르기 상태 확인
+		if (!Rolling)
+		{
+			Server_StartFire(TargetLocation);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("StartFire: Blocked - Character started rolling just before RPC send."));
+		}
 		return;
 	}
 
 	// 서버 플레이어의 경우 타겟 위치를 직접 계산
+	// 서버 플레이어도 구르기 체크 (이중 안전장치)
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("StartFire: Blocked on server player - Character is rolling."));
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		}
+		return;
+	}
+
 	FVector TargetLocation = FVector::ZeroVector;
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -740,7 +818,15 @@ void ALostSectorCharacter::StartFire()
 		}
 	}
 	
-	Server_StartFire(TargetLocation);
+	// 마지막 체크: 서버 플레이어도 RPC 전송 직전에 다시 한 번 확인
+	if (!Rolling)
+	{
+		Server_StartFire(TargetLocation);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("StartFire: Blocked on server player - Character started rolling just before RPC."));
+	}
 }
 
 bool ALostSectorCharacter::Server_StartFire_Validate(FVector ClientTargetLocation)
@@ -797,6 +883,8 @@ void ALostSectorCharacter::Server_StartFire_Implementation(FVector ClientTargetL
 		
 		// 또는 서버 플레이어의 경우 직접 계산
 		if (ClientTargetLocation != FVector::ZeroVector)
+
+
 		{
 			// 클라이언트에서 전달받은 타겟 위치 사용
 			TargetLocation = ClientTargetLocation;
@@ -852,19 +940,36 @@ void ALostSectorCharacter::Server_StartFire_Implementation(FVector ClientTargetL
 	}
 
 	// 발사 전에 다시 한 번 구르기 상태 체크 (타이머 콜백에서 호출될 수 있으므로)
+	// 이 체크는 매우 중요합니다 - 네트워크 지연으로 인해 구르기 중에 발사 요청이 도착할 수 있습니다
 	if (Rolling)
 	{
-		UE_LOG(LogTemp, VeryVerbose, TEXT("Server_StartFire: Blocked - Character started rolling during fire sequence."));
+		UE_LOG(LogTemp, Warning, TEXT("Server_StartFire: Blocked - Character is rolling during fire sequence. Clearing fire timer."));
 		// 발사 타이머가 돌고 있으면 즉시 중지
 		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
 		{
 			GetWorldTimerManager().ClearTimer(FireTimerHandle);
 		}
+		// 발사 정지 상태 확보
+		Server_StopFire();
 		return;
 	}
 
 	// 3. 발사 시도 (무기 클래스의 Fire 함수가 멀티캐스트를 처리함)
-	CurrentWeapon->Fire(FireDirection);
+	// 발사 직전에 마지막으로 한 번 더 체크
+	if (!Rolling)
+	{
+		CurrentWeapon->Fire(FireDirection);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_StartFire: Blocked - Character started rolling just before Fire() call."));
+		if (GetWorldTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			GetWorldTimerManager().ClearTimer(FireTimerHandle);
+		}
+		Server_StopFire();
+		return;
+	}
 
 	// 4. 블루프린트 이벤트 호출 (추가 시각적 효과용)
 	Multicast_StartFire();
@@ -976,23 +1081,62 @@ void ALostSectorCharacter::Look(const FInputActionValue& Value)
 
 void ALostSectorCharacter::Reload(const FInputActionValue& Value)
 {
-	// 구르기 중이면 재장전 불가
+	// 구르기 중이면 재장전 불가 (최우선 체크)
 	if (Rolling)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot reload: Character is rolling."));
+		UE_LOG(LogTemp, Warning, TEXT("Cannot reload: Character is rolling (Role: %d)."), (int32)GetLocalRole());
+		return;
+	}
+
+	// 클라이언트에서 서버로 RPC 호출
+	if (GetLocalRole() < ROLE_Authority)
+	{
+		Server_Reload();
+		return;
+	}
+
+	// 서버에서 실제 재장전 로직 실행
+	Server_Reload();
+}
+
+bool ALostSectorCharacter::Server_Reload_Validate()
+{
+	// 구르기 중이면 검증 실패
+	if (Rolling)
+	{
+		return false;
+	}
+	return true;
+}
+
+void ALostSectorCharacter::Server_Reload_Implementation()
+{
+	// 구르기 중이면 재장전 불가 (서버에서도 체크)
+	if (Rolling)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Server_Reload: Blocked - Character is rolling."));
 		return;
 	}
 
 	if (CurrentWeapon)
 	{
-		UE_LOG(LogTemp, Log, TEXT("Reload key pressed. Calling WeaponReload on %s"), *CurrentWeapon->GetName());
+		// 마지막 체크: 무기 재장전 직전에 다시 한 번 구르기 상태 확인
+		if (Rolling)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Server_Reload: Blocked - Character started rolling just before reload."));
+			return;
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("Server_Reload: Calling WeaponReload on %s (Role: %d)"), 
+			*CurrentWeapon->GetName(), (int32)GetLocalRole());
 
 		// AWeapon.cpp에서 구현된 WeaponReload 함수 호출
+		// WeaponReload 내부에서 Multicast_PlayReloadAnimation이 호출됨
 		CurrentWeapon->WeaponReload();
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Cannot reload: No CurrentWeapon equipped."));
+		UE_LOG(LogTemp, Warning, TEXT("Server_Reload: No CurrentWeapon equipped."));
 	}
 }
 
@@ -1440,4 +1584,5 @@ void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(ALostSectorCharacter, HeadPitch);
 	DOREPLIFETIME(ALostSectorCharacter, ReplicatedRotation);
 	DOREPLIFETIME(ALostSectorCharacter, Rolling);
+	DOREPLIFETIME(ALostSectorCharacter, bIsSprinting);
 }

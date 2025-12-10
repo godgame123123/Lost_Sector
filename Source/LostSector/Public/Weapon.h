@@ -53,6 +53,9 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Weapon|Animation")
     TObjectPtr<UAnimMontage> FireAnimMontage;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Weapon|Animation")
+    TObjectPtr<UAnimMontage> ReloadAnimMontage;
+
     
 public:
 
@@ -82,6 +85,10 @@ public:
     // 발사 이펙트를 모든 클라이언트에서 재생하는 Multicast RPC
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayFireEffects(FVector StartLocation, FVector Direction);
+
+    // 재장전 애니메이션을 모든 클라이언트에서 재생하는 Multicast RPC
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayReloadAnimation();
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Customization")
     FVector MeshOffsetLocation; 
