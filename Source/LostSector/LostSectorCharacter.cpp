@@ -690,6 +690,7 @@ void ALostSectorCharacter::EquipWeapon()
 			{
 				UE_LOG(LogTemp, Warning, TEXT("%s Equipped Weapon but FAILED to add spare ammo. Check Inventory capacity or ItemData."), *GetName());
 			}
+			OnAmmoUpdated();
 		}
 
 		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
@@ -1311,6 +1312,7 @@ void ALostSectorCharacter::Multicast_StartFire_Implementation()
 	// 모든 클라이언트에서 발사 이펙트/애니메이션 재생
 	// 블루프린트에서 구현된 OnStartFire 이벤트 호출
 	OnStartFire();
+	OnAmmoUpdated();
 	
 	UE_LOG(LogTemp, Log, TEXT("Multicast_StartFire: %s"), *GetName());
 }
