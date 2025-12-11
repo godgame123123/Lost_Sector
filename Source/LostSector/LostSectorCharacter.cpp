@@ -21,6 +21,9 @@
 #include "Net/UnrealNetwork.h"
 #include "DeathDropBox.h"
 #include "Blueprint/UserWidget.h"
+#include "UMiniMapWidget.h"
+#include "AMiniMapCapture.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -155,6 +158,12 @@ void ALostSectorCharacter::BeginPlay()
 		true
 	);
 	EquipWeapon();
+	
+	// 미니맵 초기화 (플레이어만)
+	if (IsPlayerControlled())
+	{
+		InitializeMiniMap();
+	}
 }
 float ALostSectorCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
@@ -203,6 +212,9 @@ void ALostSectorCharacter::Tick(float DeltaTime)
 	if (IsPlayerControlled() && !bIsDead) // 플레이어 제어 중, 살아있을 때만 실행
 	{
 		HandleOcclusionFade();
+		
+		// 미니맵 업데이트
+		UpdateMiniMap();
 
 		APlayerController* PC = Cast<APlayerController>(GetController());
 		if (PC && GetMesh())
@@ -1434,6 +1446,87 @@ void ALostSectorCharacter::Multicast_Die_Implementation(APlayerController* DeadP
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("💀 Multicast_Die: PlayerController를 찾을 수 없습니다. NetMode: %d"), (int32)GetNetMode());
+	}
+}
+
+void ALostSectorCharacter::InitializeMiniMap()
+{
+	if (!IsPlayerControlled())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	// 미니맵 Scene Capture 액터 생성
+	if (!MiniMapCaptureActor)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		SpawnParams.Instigator = this;
+		
+		MiniMapCaptureActor = World->SpawnActor<AMiniMapCapture>(
+			AMiniMapCapture::StaticClass(),
+			GetActorLocation() + FVector(0.0f, 0.0f, 5000.0f),
+			FRotator(-90.0f, 0.0f, 0.0f),
+			SpawnParams
+		);
+
+		if (MiniMapCaptureActor)
+		{
+			MiniMapCaptureActor->SetTarget(this);
+			UE_LOG(LogTemp, Log, TEXT("✅ MiniMap Capture Actor 생성 완료"));
+		}
+	}
+
+	// 미니맵 위젯 생성
+	if (MiniMapWidgetClass && !MiniMapWidgetInstance)
+	{
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			MiniMapWidgetInstance = CreateWidget<UUserWidget>(PC, MiniMapWidgetClass);
+			if (MiniMapWidgetInstance)
+			{
+				MiniMapWidgetInstance->AddToViewport();
+				
+				// Render Target을 위젯에 설정
+				if (UMiniMapWidget* MiniMapWidget = Cast<UMiniMapWidget>(MiniMapWidgetInstance))
+				{
+					if (MiniMapCaptureActor && MiniMapCaptureActor->GetRenderTarget())
+					{
+						// Material을 사용하여 Render Target을 표시
+						// 블루프린트에서 Material Instance를 설정하거나,
+						// 여기서 Material을 로드하여 설정할 수 있습니다.
+						UE_LOG(LogTemp, Log, TEXT("✅ MiniMap Widget 생성 완료. Render Target: %s"), 
+							*MiniMapCaptureActor->GetRenderTarget()->GetName());
+					}
+				}
+			}
+		}
+	}
+}
+
+void ALostSectorCharacter::UpdateMiniMap()
+{
+	if (!IsPlayerControlled() || !MiniMapWidgetInstance)
+	{
+		return;
+	}
+
+	if (UMiniMapWidget* MiniMapWidget = Cast<UMiniMapWidget>(MiniMapWidgetInstance))
+	{
+		// 플레이어 위치 업데이트
+		FVector Location = GetActorLocation();
+		FRotator Rotation = GetActorRotation();
+		
+		FVector2D WorldPosition = FVector2D(Location.X, Location.Y);
+		float YawRotation = Rotation.Yaw;
+		
+		MiniMapWidget->UpdatePlayerPosition(WorldPosition, YawRotation);
 	}
 }
 
