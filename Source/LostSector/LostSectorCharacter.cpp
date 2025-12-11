@@ -1341,7 +1341,14 @@ void ALostSectorCharacter::Multicast_Die_Implementation(APlayerController* DeadP
 	// 블루프린트에서 구현된 OnDie 이벤트 호출
 	OnDie();
 	
-	UE_LOG(LogTemp, Log, TEXT("Multicast_Die: %s"), *GetName());
+	UE_LOG(LogTemp, Log, TEXT("Multicast_Die: %s, IsPlayerControlled: %d"), *GetName(), IsPlayerControlled() ? 1 : 0);
+
+	// 플레이어가 아닌 경우(몬스터/AI) UI를 표시하지 않음
+	if (!IsPlayerControlled())
+	{
+		UE_LOG(LogTemp, Log, TEXT("💀 Multicast_Die: AI 캐릭터 사망 - UI 표시하지 않음"));
+		return;
+	}
 
 	// 모든 클라이언트에서 게임 오버 위젯 표시
 	// 서버 플레이어도 포함하여 자신의 캐릭터가 죽었을 때 UI를 표시
