@@ -168,6 +168,8 @@ public:
 	// 블루프린트에서 구현 가능한 발사 정지 이벤트
 	UFUNCTION(BlueprintImplementableEvent, Category = "Weapon")
 	void OnStopFire();
+	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+	void OnAmmoUpdated();
 public:
 
 	// 플레이어 사망 처리
