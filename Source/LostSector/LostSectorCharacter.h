@@ -269,6 +269,18 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class UUserWidget> DeathWidgetInstance;
 
+	// 미니맵 위젯 클래스
+	UPROPERTY(EditDefaultsOnly, Category = "UI|MiniMap")
+	TSubclassOf<class UUserWidget> MiniMapWidgetClass;
+
+	// 미니맵 위젯 인스턴스
+	UPROPERTY()
+	TObjectPtr<class UUserWidget> MiniMapWidgetInstance;
+
+	// 미니맵 Scene Capture 액터
+	UPROPERTY(BlueprintReadOnly, Category = "UI|MiniMap")
+	class AMiniMapCapture* MiniMapCaptureActor;
+
 	UPROPERTY()
 	TSet<AActor*> ActorsToRestoreOpacity;
 
@@ -292,6 +304,14 @@ public:
 	// 회전 정보를 서버로 전송하는 RPC
 	UFUNCTION(Server, Reliable, WithValidation)
 	void Server_UpdateRotation(FRotator NewRotation);
+
+	// 미니맵 초기화
+	UFUNCTION(BlueprintCallable, Category = "UI|MiniMap")
+	void InitializeMiniMap();
+
+	// 미니맵 업데이트
+	UFUNCTION(BlueprintCallable, Category = "UI|MiniMap")
+	void UpdateMiniMap();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };
