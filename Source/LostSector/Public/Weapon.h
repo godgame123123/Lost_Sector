@@ -90,6 +90,14 @@ public:
     UFUNCTION(NetMulticast, Reliable)
     void Multicast_PlayReloadAnimation();
 
+    // 발사 사운드를 모든 클라이언트에서 재생하는 Multicast RPC
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayFireSound(FVector SoundLocation);
+
+    // 재장전 사운드를 모든 클라이언트에서 재생하는 Multicast RPC
+    UFUNCTION(NetMulticast, Reliable)
+    void Multicast_PlayReloadSound(FVector SoundLocation);
+
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Customization")
     FVector MeshOffsetLocation; 
 

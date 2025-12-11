@@ -175,7 +175,7 @@ public:
 	void Die();
 
 	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_Die();
+	void Multicast_Die(APlayerController* DeadPlayerController);
 
 	// 블루프린트에서 구현 가능한 사망 이벤트
 	UFUNCTION(BlueprintImplementableEvent, Category = "Death")
@@ -276,6 +276,10 @@ public:
 	// 재장전 텍스트 위젯의 표시 여부를 제어하는 공용 함수
 	UFUNCTION(BlueprintCallable, Category = "Combat")
 	void SetReloadingTextVisible(bool bShow); // 함수명 변경 (ShowReloadingText 대신 SetReloadingTextVisible 사용)
+
+	// 재장전 텍스트를 모든 클라이언트에서 표시/숨김하는 Multicast RPC
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_SetReloadingTextVisible(bool bShow);
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Look", Replicated)
 	float HeadPitch = 0.0f; // ⬅️ 이 변수를 추가합니다.

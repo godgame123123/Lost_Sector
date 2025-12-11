@@ -274,13 +274,10 @@ void AWeapon::Fire(FVector Direction)
     
     FVector StartLocation = MuzzleLocation ? MuzzleLocation->GetComponentLocation() : GetActorLocation();
 
-    if (FireSound)
+    // 발사 사운드를 모든 클라이언트에서 재생
+    if (HasAuthority())
     {
-        UGameplayStatics::PlaySoundAtLocation(
-            GetWorld(),
-            FireSound,
-            StartLocation
-        );
+        Multicast_PlayFireSound(StartLocation);
     }
   
     FVector FinalFireDirection = Direction;
@@ -387,21 +384,16 @@ void AWeapon::WeaponReload()
     if (HasAuthority())
     {
         Multicast_PlayReloadAnimation();
-    }
-
-    if (ReloadSound)
-    {
-        UGameplayStatics::PlaySoundAtLocation(
-            GetWorld(),
-            ReloadSound,
-            GetActorLocation()
-        );
-    }
-
-    ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
-    if (Character)
-    {
-        Character->SetReloadingTextVisible(true);
+        
+        // 재장전 사운드를 모든 클라이언트에서 재생
+        Multicast_PlayReloadSound(GetActorLocation());
+        
+        // 리로딩 텍스트를 모든 클라이언트에서 표시
+        ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
+        if (Character)
+        {
+            Character->Multicast_SetReloadingTextVisible(true);
+        }
     }
 
     GetWorld()->GetTimerManager().SetTimer(
@@ -425,7 +417,8 @@ void AWeapon::FinishReload()
     ALostSectorCharacter* Character = Cast<ALostSectorCharacter>(GetOwner());
     if (Character)
     {
-        Character->SetReloadingTextVisible(false);
+        // 모든 클라이언트에서 리로딩 텍스트 숨김
+        Character->Multicast_SetReloadingTextVisible(false);
     }
 
     // 1. �÷��� ����
@@ -600,5 +593,31 @@ void AWeapon::Multicast_PlayFireEffects_Implementation(FVector StartLocation, FV
             const float BulletSpeed = 20000.0f;
             TracerActor->StartMoving(TargetLocation, BulletSpeed);
         }
+    }
+}
+
+void AWeapon::Multicast_PlayFireSound_Implementation(FVector SoundLocation)
+{
+    // 모든 클라이언트에서 발사 사운드 재생
+    if (FireSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            GetWorld(),
+            FireSound,
+            SoundLocation
+        );
+    }
+}
+
+void AWeapon::Multicast_PlayReloadSound_Implementation(FVector SoundLocation)
+{
+    // 모든 클라이언트에서 재장전 사운드 재생
+    if (ReloadSound)
+    {
+        UGameplayStatics::PlaySoundAtLocation(
+            GetWorld(),
+            ReloadSound,
+            SoundLocation
+        );
     }
 }
