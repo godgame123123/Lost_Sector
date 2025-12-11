@@ -20,6 +20,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "DeathDropBox.h"
+#include "Blueprint/UserWidget.h"
 
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -479,6 +480,12 @@ void ALostSectorCharacter::SetReloadingTextVisible(bool bShow)
 	{
 		ReloadTextWidgetComponent->SetVisibility(bShow);
 	}
+}
+
+void ALostSectorCharacter::Multicast_SetReloadingTextVisible_Implementation(bool bShow)
+{
+	// 모든 클라이언트에서 재장전 텍스트 표시/숨김
+	SetReloadingTextVisible(bShow);
 }
 bool ALostSectorCharacter::ConsumeStamina(float StaminaCost)
 {
@@ -1258,21 +1265,7 @@ void ALostSectorCharacter::Die()
 
 			// 마우스 커서 보이게 설정
 			PC->bShowMouseCursor = true;
-			if (DeathWidgetClass && PC->IsLocalController())
-			{
-				if (!DeathWidgetInstance)
-				{
-					// 위젯 생성
-					DeathWidgetInstance = CreateWidget<UUserWidget>(PC, DeathWidgetClass);
-
-					if (DeathWidgetInstance)
-					{
-						// 뷰포트에 추가
-						DeathWidgetInstance->AddToViewport();
-						UE_LOG(LogTemp, Log, TEXT("💀 Death Widget added to viewport."));
-					}
-				}
-			}
+			// DeathWidget은 Multicast_Die_Implementation()에서 모든 클라이언트에 대해 처리됩니다.
 		}
 	}
 
@@ -1304,9 +1297,11 @@ void ALostSectorCharacter::Die()
 	SetLifeSpan(5.0f);
 
 	// 모든 클라이언트에서 사망 이펙트/애니메이션 재생
+	// 컨트롤러를 분리하기 전에 컨트롤러를 저장
+	APlayerController* DeadPlayerController = Cast<APlayerController>(GetController());
 	if (HasAuthority())
 	{
-		Multicast_Die();
+		Multicast_Die(DeadPlayerController);
 	}
 }
 
@@ -1338,13 +1333,99 @@ void ALostSectorCharacter::Multicast_EquipWeapon_Implementation()
 	UE_LOG(LogTemp, Log, TEXT("Multicast_EquipWeapon: %s"), *GetName());
 }
 
-void ALostSectorCharacter::Multicast_Die_Implementation()
+void ALostSectorCharacter::Multicast_Die_Implementation(APlayerController* DeadPlayerController)
 {
 	// 모든 클라이언트에서 사망 이펙트/애니메이션 재생
 	// 블루프린트에서 구현된 OnDie 이벤트 호출
 	OnDie();
 	
 	UE_LOG(LogTemp, Log, TEXT("Multicast_Die: %s"), *GetName());
+
+	// 모든 클라이언트에서 게임 오버 위젯 표시
+	// 서버 플레이어도 포함하여 자신의 캐릭터가 죽었을 때 UI를 표시
+	APlayerController* PC = DeadPlayerController;
+	
+	// 파라미터로 받은 컨트롤러가 없으면 다른 방법으로 찾기
+	if (!PC)
+	{
+		PC = Cast<APlayerController>(GetController());
+	}
+	
+	// 여전히 없으면 서버 플레이어의 경우 GetFirstPlayerController() 사용
+	if (!PC)
+	{
+		UWorld* World = GetWorld();
+		if (World)
+		{
+			ENetMode NetMode = GetNetMode();
+			if (NetMode == NM_ListenServer || NetMode == NM_Standalone)
+			{
+				PC = World->GetFirstPlayerController();
+				UE_LOG(LogTemp, Log, TEXT("💀 Multicast_Die: 서버 플레이어 컨트롤러 찾기 시도. NetMode: %d"), (int32)NetMode);
+			}
+		}
+	}
+	
+	if (PC)
+	{
+		// IsLocalController()는 클라이언트에서만 true를 반환하므로,
+		// 서버 플레이어의 경우 GetNetMode()를 확인하여 처리
+		bool bShouldShowWidget = false;
+		ENetMode NetMode = GetNetMode();
+		
+		if (PC->IsLocalController())
+		{
+			// 클라이언트 플레이어
+			bShouldShowWidget = true;
+			UE_LOG(LogTemp, Log, TEXT("💀 Multicast_Die: 클라이언트 플레이어 - UI 표시"));
+		}
+		else if (NetMode == NM_ListenServer || NetMode == NM_Standalone)
+		{
+			// 서버 플레이어 (Listen Server 또는 Standalone)
+			// 파라미터로 받은 컨트롤러가 있으면 서버 플레이어
+			// 또는 GetFirstPlayerController()로 가져온 경우 항상 서버 플레이어
+			if (DeadPlayerController || !GetController())
+			{
+				bShouldShowWidget = true;
+				UE_LOG(LogTemp, Log, TEXT("💀 Multicast_Die: 서버 플레이어 - UI 표시. HasController: %d, DeadPlayerController: %d"), 
+					GetController() ? 1 : 0, DeadPlayerController ? 1 : 0);
+			}
+		}
+		
+		if (DeathWidgetClass && bShouldShowWidget)
+		{
+			if (!DeathWidgetInstance)
+			{
+				// 위젯 생성
+				DeathWidgetInstance = CreateWidget<UUserWidget>(PC, DeathWidgetClass);
+
+				if (DeathWidgetInstance)
+				{
+					// 뷰포트에 추가
+					DeathWidgetInstance->AddToViewport();
+					UE_LOG(LogTemp, Log, TEXT("💀 Death Widget added to viewport. NetMode: %d, IsLocalController: %d, HasController: %d"), 
+						(int32)NetMode, PC->IsLocalController() ? 1 : 0, GetController() ? 1 : 0);
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error, TEXT("💀 Death Widget 생성 실패!"));
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("💀 Death Widget이 이미 존재합니다."));
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("💀 Death Widget 표시 조건 불만족. DeathWidgetClass: %d, bShouldShowWidget: %d"), 
+				DeathWidgetClass ? 1 : 0, bShouldShowWidget ? 1 : 0);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("💀 Multicast_Die: PlayerController를 찾을 수 없습니다. NetMode: %d"), (int32)GetNetMode());
+	}
 }
 
 // 구르기 관련 함수 구현
