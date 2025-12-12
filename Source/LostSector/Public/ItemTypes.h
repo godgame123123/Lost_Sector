@@ -17,6 +17,17 @@ struct FItemStack          // ← API 매크로 넣지 마세요
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite)
     int32 Count = 0;
+    // ✅ [추가] 인벤토리 격자 위치 (X좌표)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    int32 Col = 0;
+
+    // ✅ [추가] 인벤토리 격자 위치 (Y좌표)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    int32 Row = 0;
+
+    // ✅ [추가] 아이템 회전 여부 (세로/가로 변경 시 필요)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    bool bRotated = false;
 
     // ✅ Item이 설정될 때 ItemId도 함께 업데이트
     void SetItem(UItemDataBase* InItem)
