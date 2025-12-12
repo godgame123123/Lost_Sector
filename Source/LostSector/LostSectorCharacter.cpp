@@ -583,7 +583,7 @@ void ALostSectorCharacter::StaminaRegenDrainTick()
 
 	if (bIsSprinting)
 	{
-		StaminaChange = -1.0f;
+		StaminaChange = -0.5f;
 	}
 	else 
 	{
@@ -629,24 +629,24 @@ void ALostSectorCharacter::HungerDrainTick()
 	{
 		return;
 	}
-	if (CharacterStats.hungry > 0.0f) 
+	/*if (CharacterStats.hungry > 0.0f) 
 	{
 		CharacterStats.hungry -= HungerDrainPerTick;
 
 		CharacterStats.hungry = FMath::Max(0.0f, CharacterStats.hungry);
-	}
+	}*/
 
-	if (CharacterStats.hungry <= 0.0f)
-	{
-		if (CharacterStats.Hp > 0.0f)
-		{
-			CharacterStats.Hp -= HealthDrainPerTick;
+	//if (CharacterStats.hungry <= 0.0f)
+	//{
+	//	if (CharacterStats.Hp > 0.0f)
+	//	{
+	//		CharacterStats.Hp -= HealthDrainPerTick;
 
-			CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
+	//		CharacterStats.Hp = FMath::Max(0.0f, CharacterStats.Hp);
 
-			UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
-		}
-	}
+	//		UE_LOG(LogTemp, Warning, TEXT("Hunger 0! Health reduced. Current HP: %f"), CharacterStats.Hp);
+	//	}
+	//}
 	if (CharacterStats.Hp <= 0.0f && !bIsDead)
 	{
 		Die();
@@ -1768,4 +1768,5 @@ void ALostSectorCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(ALostSectorCharacter, ReplicatedRotation);
 	DOREPLIFETIME(ALostSectorCharacter, Rolling);
 	DOREPLIFETIME(ALostSectorCharacter, bIsSprinting);
+	DOREPLIFETIME(ALostSectorCharacter, CurrentWeapon);
 }
