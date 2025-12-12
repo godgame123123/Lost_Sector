@@ -127,7 +127,7 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
 	float RollingStaminaCost = 20.0f;
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon", Replicated)
 	TObjectPtr<class AWeapon> CurrentWeapon;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
