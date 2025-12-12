@@ -26,7 +26,7 @@ public:
 
 
     // 컨테이너 인벤토리를 외부 목록으로 초기화하는 함수 (가상 함수로 선언)
-    virtual void InitializeLoot(const TArray<FItemStack>& InventoryToStore);
+    
 private:
     bool TryLock(AController* By);
     void Unlock(AController* By);

@@ -19,7 +19,7 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "DeathDropBox.h"
+#include "LootInitializerComponent.h"
 #include "Blueprint/UserWidget.h"
 #include "UMiniMapWidget.h"
 #include "AMiniMapCapture.h"
@@ -1234,18 +1234,28 @@ void ALostSectorCharacter::Die()
 			FActorSpawnParameters SpawnParams;
 			SpawnParams.Instigator = GetInstigator();
 
-			ADeathDropBox* DeathBox = GetWorld()->SpawnActor<ADeathDropBox>(
+			AActor* LootBox = GetWorld()->SpawnActor<AActor>(
 				LootContainerClass,
 				SpawnLocation,
 				SpawnRotation,
 				SpawnParams
 			);
 
-			if (DeathBox)
+			if (LootBox)
 			{
-				// 5. 컨테이너에 아이템 데이터 전달 및 초기화
-				DeathBox->InitializeLoot(DroppedItems);
-				UE_LOG(LogTemp, Log, TEXT("📦 Dropped DeathDropBox with %d unique stacks."), DroppedItems.Num());
+				ULootInitializerComponent* InitializerComp = LootBox->FindComponentByClass<ULootInitializerComponent>();
+
+				if (InitializerComp)
+				{
+					// 컴포넌트를 통해 초기화 함수를 호출하고 아이템 배열을 전달합니다.
+					InitializerComp->InitializeLoot(DroppedItems);
+					UE_LOG(LogTemp, Log, TEXT("📦 Dropped Loot Box initialized via Component with %d stacks."), DroppedItems.Num());
+				}
+				else
+				{
+					// BP_DeathCrate에 컴포넌트가 올바르게 부착되었는지 확인합니다.
+					UE_LOG(LogTemp, Error, TEXT("📦 Error: Spawned Loot Box is missing ULootInitializerComponent! Check blueprint setup."));
+				}
 			}
 		}
 
