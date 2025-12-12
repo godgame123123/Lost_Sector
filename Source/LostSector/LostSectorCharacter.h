@@ -219,7 +219,7 @@ protected:
 
 	// 스폰할 사망 드롭 박스 블루프린트 클래스를 지정합니다.
 	UPROPERTY(EditDefaultsOnly, Category = "Loot")
-	TSubclassOf<ADeathDropBox> LootContainerClass;
+	TSubclassOf<AActor> LootContainerClass;
 protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
