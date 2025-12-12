@@ -6,8 +6,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "LostSectorGameMode.generated.h"
 
-UCLASS(minimalapi)
-class ALostSectorGameMode : public AGameModeBase
+UCLASS()
+class LOSTSECTOR_API ALostSectorGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
@@ -54,7 +54,7 @@ protected:
 	void TravelToGameMap();
 
 	// 인원 체크 및 게임 시작
-	void CheckAndStartGame();
+	virtual void CheckAndStartGame();
 
 	// 테스트용 콘솔 명령어
 	UFUNCTION(Exec)

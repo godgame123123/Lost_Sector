@@ -1,8 +1,8 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "LostSectorGameMode.h"
-#include "LostSectorCharacter.h"
-#include "Private/MyPlayerState.h"
+#include "../LostSectorCharacter.h"
+#include "MyPlayerState.h"
 #include "UObject/ConstructorHelpers.h"
 #include "InventorySaveManager.h"
 #include "InventoryComponent.h"
@@ -221,18 +221,27 @@ void ALostSectorGameMode::PostLogin(APlayerController* NewPlayer)
 	// 서버에서만 인원 체크 및 게임 시작
 	if (HasAuthority())
 	{
-		// PostLogin이 호출된 후에는 새로운 플레이어가 이미 카운트에 포함되어 있음
-		int32 PlayerCountAfterLogin = GetNumPlayers();
-		
-		if (bGameStarting)
+		// 게임맵에서는 CheckAndStartGame을 호출하지 않음
+		FString CurrentMapName = GetWorld()->GetMapName();
+		if (CurrentMapName.Contains(TEXT("GameMap")))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[PostLogin] ⚠️ 게임이 이미 시작 중입니다. CheckAndStartGame 호출 건너뜀 (현재 플레이어: %d)"), PlayerCountAfterLogin);
+			UE_LOG(LogTemp, Log, TEXT("[PostLogin] 게임맵에서는 CheckAndStartGame을 호출하지 않습니다. 맵 이름: %s"), *CurrentMapName);
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[PostLogin] ✅ CheckAndStartGame 호출 (현재 플레이어: %d/%d)"), PlayerCountAfterLogin, MaxPlayers);
-			// 인원이 충분하면 게임 시작 체크
-			CheckAndStartGame();
+			// PostLogin이 호출된 후에는 새로운 플레이어가 이미 카운트에 포함되어 있음
+			int32 PlayerCountAfterLogin = GetNumPlayers();
+			
+			if (bGameStarting)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[PostLogin] ⚠️ 게임이 이미 시작 중입니다. CheckAndStartGame 호출 건너뜀 (현재 플레이어: %d)"), PlayerCountAfterLogin);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[PostLogin] ✅ CheckAndStartGame 호출 (현재 플레이어: %d/%d)"), PlayerCountAfterLogin, MaxPlayers);
+				// 인원이 충분하면 게임 시작 체크
+				CheckAndStartGame();
+			}
 		}
 	}
 	else
