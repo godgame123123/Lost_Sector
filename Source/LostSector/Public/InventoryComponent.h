@@ -84,6 +84,13 @@ public:
     float GetTotalWeight() const;
 
     UFUNCTION(BlueprintCallable, Category = "Inventory")
+    bool CanAddItem(class UItemDataBase* ItemData, int32 Count);
+
+   
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
+    int32 AddItem(class UItemDataBase* ItemData, int32 Count);
+
+    UFUNCTION(BlueprintCallable, Category = "Inventory")
     bool TryAddStack(const FItemStack& InStack, int32& OutAdded);
 
     UFUNCTION(BlueprintCallable, Category = "Inventory")

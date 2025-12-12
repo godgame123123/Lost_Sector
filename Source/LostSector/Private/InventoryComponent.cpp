@@ -243,6 +243,55 @@ bool UInventoryComponent::CanAddWeight(float AddW) const
 {
     return (GetTotalWeight() + AddW) <= WeightLimit;
 }
+bool UInventoryComponent::CanAddItem(UItemDataBase* ItemData, int32 Count)
+{
+    if (!ItemData || Count <= 0) return false;
+
+    // 1. 무게 체크 (위의 float 버전 CanAddWeight 함수 사용)
+    float WeightToAdd = ItemData->Weight * Count;
+    if (!CanAddWeight(WeightToAdd)) return false;
+
+    // 2. 공간(슬롯) 체크
+    int32 RemainingCount = Count;
+
+    // A. 겹쳐지기(Stack) 확인
+    for (const FItemStack& Slot : Slots)
+    {
+        if (Slot.Item == ItemData && Slot.Count < ItemData->MaxStack)
+        {
+            int32 SpaceInSlot = ItemData->MaxStack - Slot.Count;
+            RemainingCount -= SpaceInSlot;
+            if (RemainingCount <= 0) return true;
+        }
+    }
+
+    // B. 빈 슬롯 확인
+    for (const FItemStack& Slot : Slots)
+    {
+        if (Slot.Item == nullptr)
+        {
+            RemainingCount -= ItemData->MaxStack;
+            if (RemainingCount <= 0) return true;
+        }
+    }
+
+    return false; // 공간 부족
+}
+
+int32 UInventoryComponent::AddItem(UItemDataBase* ItemData, int32 Count)
+{
+    if (!ItemData || Count <= 0) return 0;
+
+    FItemStack NewStack;
+    NewStack.Item = ItemData;
+    NewStack.ItemId = ItemData->ItemId;
+    NewStack.Count = Count;
+
+    int32 AddedAmount = 0;
+    TryAddStack(NewStack, AddedAmount);
+
+    return AddedAmount;
+}
 
 bool UInventoryComponent::TryAddStack(const FItemStack& InStack, int32& OutAdded)
 {
