@@ -1,9 +1,14 @@
 ﻿#pragma once
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "ItemTypes.h"
 #include "Interactable.h"
 #include "ItemPickup.generated.h"
+
+class UStaticMeshComponent;
+class USkeletalMeshComponent;
+class USceneComponent;
 
 UCLASS()
 class LOSTSECTOR_API AItemPickup : public AActor, public IInteractable
@@ -13,24 +18,31 @@ class LOSTSECTOR_API AItemPickup : public AActor, public IInteractable
 public:
     AItemPickup();
 
+    /** 아이템 스택 */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = OnRep_Stack, Category = "Item")
     FItemStack Stack;
 
-    UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, Category = "Item")
     float MaxUseDistance = 220.f;
 
 protected:
+    /** ✅ Root (절대 위치 변경 금지) */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    USceneComponent* SceneRoot;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    class UStaticMeshComponent* StaticMeshComp;
+    /** Static Mesh */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    UStaticMeshComponent* StaticMeshComp;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-    class USkeletalMeshComponent* SkeletalMeshComp;
+    /** Skeletal Mesh */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    USkeletalMeshComponent* SkeletalMeshComp;
+
+protected:
+    virtual void BeginPlay() override;
+    virtual void OnConstruction(const FTransform& Transform) override;
 
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-    virtual void OnConstruction(const FTransform& Transform) override;
-    virtual void BeginPlay() override;
 
     UFUNCTION()
     void OnRep_Stack();
@@ -38,12 +50,9 @@ protected:
     void ApplyVisualFromData();
 
 public:
-
-    // 🔥 위치 튀는 버그 해결
-    // Unreal Engine 5.3에서는 PostEditMove가 AActor의 멤버가 아니므로 제거
-    // PostEditChangeProperty는 UObject의 멤버이므로 사용 가능 (에디터에서 프로퍼티 변경 시 시각 업데이트)
+    // 🔥 UE5.3: PostEditMove 없음 → Property 변경만 처리
     virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-    
-    // BlueprintNativeEvent 구현 (override 키워드 사용 불가 - BlueprintNativeEvent는 가상 함수가 아님)
+
+    // BlueprintNativeEvent
     virtual void Interact_Implementation(ACharacter* ByWho);
 };
