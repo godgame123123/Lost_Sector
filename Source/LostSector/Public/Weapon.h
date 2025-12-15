@@ -63,6 +63,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
     TObjectPtr<class UStaticMeshComponent> WeaponMesh;
 
+
     
     UPROPERTY(VisibleAnywhere, Category = "Mesh")
     TObjectPtr<USceneComponent> MuzzleLocation;
@@ -71,8 +72,12 @@ public:
     USceneComponent* GetMuzzleLocation() const { return MuzzleLocation; }
 
     
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon|Stats", ReplicatedUsing = OnRep_CurrentAmmo)
     int32 CurrentAmmo;
+
+    UFUNCTION()
+    void OnRep_CurrentAmmo();
+
 
     
     UFUNCTION(BlueprintCallable, Category = "Combat")
@@ -116,6 +121,9 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Stats")
     TObjectPtr<class UItemDataBase> RequiredAmmoItemData;
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
     FTimerHandle FireRateTimerHandle;
 
