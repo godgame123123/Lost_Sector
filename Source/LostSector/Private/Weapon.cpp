@@ -13,6 +13,7 @@
 #include "InventoryComponent.h"
 #include "../LostSectorCharacter.h"
 #include "Perception/AIPerceptionSystem.h"
+#include "Net/UnrealNetwork.h"
 
 AWeapon::AWeapon()
 {
@@ -50,6 +51,18 @@ void AWeapon::BeginPlay()
         // 2. �����ϵ� �����ؾ� �Ѵٸ� (�� ũ�Ⱑ �ٸ� ���)
         // WeaponMesh->SetRelativeScale3D(FVector(1.0f)); // �ʿ��� ������ �� ����
     }
+}
+
+void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+    DOREPLIFETIME(AWeapon, CurrentAmmo);
+}
+
+void AWeapon::OnRep_CurrentAmmo()
+{
+    // CurrentAmmo가 리플리케이션으로 업데이트되었을 때 호출됩니다.
+    // 필요시 UI 업데이트나 다른 로직을 여기에 추가할 수 있습니다.
 }
 
 void AWeapon::ResetFire()
