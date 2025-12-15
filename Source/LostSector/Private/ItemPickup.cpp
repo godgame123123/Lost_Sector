@@ -2,6 +2,7 @@
 #include "ItemDataBase.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SceneComponent.h"
 #include "InventoryComponent.h"
 #include "GameFramework/Character.h"
 #include "Net/UnrealNetwork.h"
@@ -10,32 +11,33 @@ AItemPickup::AItemPickup()
 {
     bReplicates = true;
 
+    /** 🔹 Root */
+    SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+    SetRootComponent(SceneRoot);
+
+    /** 🔹 Static Mesh */
     StaticMeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StaticMesh"));
-    SetRootComponent(StaticMeshComp);
+    StaticMeshComp->SetupAttachment(SceneRoot);
 
     StaticMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     StaticMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     StaticMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     StaticMeshComp->SetGenerateOverlapEvents(true);
     StaticMeshComp->SetCollisionObjectType(ECC_WorldDynamic);
-    StaticMeshComp->bTraceComplexOnMove = true;
-    StaticMeshComp->bReturnMaterialOnMove = true;
 
+    /** 🔹 Skeletal Mesh */
     SkeletalMeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkeletalMesh"));
-    SkeletalMeshComp->SetupAttachment(RootComponent);
+    SkeletalMeshComp->SetupAttachment(SceneRoot);
+
     SkeletalMeshComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     SkeletalMeshComp->SetCollisionResponseToAllChannels(ECR_Ignore);
     SkeletalMeshComp->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
     SkeletalMeshComp->SetGenerateOverlapEvents(true);
-    SkeletalMeshComp->bTraceComplexOnMove = true;
-    SkeletalMeshComp->bReturnMaterialOnMove = true;
 }
 
 void AItemPickup::BeginPlay()
 {
     Super::BeginPlay();
-    // ❌ 중복 호출 제거. OnRep_Stack이 자동으로 처리함.
-    // ApplyVisualFromData();
 }
 
 void AItemPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -50,16 +52,18 @@ void AItemPickup::OnConstruction(const FTransform& Transform)
     ApplyVisualFromData();
 }
 
+#if WITH_EDITOR
 void AItemPickup::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
     Super::PostEditChangeProperty(PropertyChangedEvent);
-    
-    // 에디터에서 Stack 프로퍼티가 변경될 때 시각 업데이트
-    if (PropertyChangedEvent.Property && PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(AItemPickup, Stack))
+
+    if (PropertyChangedEvent.Property &&
+        PropertyChangedEvent.Property->GetFName() == GET_MEMBER_NAME_CHECKED(AItemPickup, Stack))
     {
         ApplyVisualFromData();
     }
 }
+#endif
 
 void AItemPickup::OnRep_Stack()
 {
@@ -74,19 +78,21 @@ void AItemPickup::ApplyVisualFromData()
     if (!Stack.Item)
         return;
 
+    /** Static Mesh */
     if (Stack.Item->WorldStaticMesh)
     {
         StaticMeshComp->SetStaticMesh(Stack.Item->WorldStaticMesh.Get());
-        StaticMeshComp->SetRelativeRotation(Stack.Item->WorldMeshRotation);
         StaticMeshComp->SetRelativeLocation(Stack.Item->WorldMeshOffset);
+        StaticMeshComp->SetRelativeRotation(Stack.Item->WorldMeshRotation);
         StaticMeshComp->SetRelativeScale3D(FVector(Stack.Item->WorldMeshScale));
         StaticMeshComp->SetVisibility(true, true);
     }
+    /** Skeletal Mesh */
     else if (Stack.Item->WorldSkeletalMesh)
     {
         SkeletalMeshComp->SetSkeletalMesh(Stack.Item->WorldSkeletalMesh.Get());
-        SkeletalMeshComp->SetRelativeRotation(Stack.Item->WorldMeshRotation);
         SkeletalMeshComp->SetRelativeLocation(Stack.Item->WorldMeshOffset);
+        SkeletalMeshComp->SetRelativeRotation(Stack.Item->WorldMeshRotation);
         SkeletalMeshComp->SetRelativeScale3D(FVector(Stack.Item->WorldMeshScale));
         SkeletalMeshComp->SetVisibility(true, true);
     }
@@ -119,3 +125,4 @@ void AItemPickup::Interact_Implementation(ACharacter* ByWho)
         }
     }
 }
+
