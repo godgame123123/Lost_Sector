@@ -333,10 +333,19 @@ void UMyGameInstance::CreateSession(int32 MaxPlayers, bool bIsLan)
 		FOnlineSessionSettings SessionSettings;
 
 		// LAN 설정 (파라미터 우선, 없으면 NULL subsystem 체크)
-		if (bIsLan || IOnlineSubsystem::Get()->GetSubsystemName() == "NULL")
-			SessionSettings.bIsLANMatch = true;
-		else
-			SessionSettings.bIsLANMatch = false;
+		IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+		FString OSSName = OSS ? OSS->GetSubsystemName().ToString() : TEXT("None");
+		
+		bool bShouldBeLAN = bIsLan || (OSS && OSS->GetSubsystemName() == "NULL");
+		SessionSettings.bIsLANMatch = bShouldBeLAN;
+		
+		UE_LOG(LogTemp, Warning, TEXT("═══════════════════════════════════════════════════════"));
+		UE_LOG(LogTemp, Warning, TEXT("[서버 생성] CreateSession 호출"));
+		UE_LOG(LogTemp, Warning, TEXT("  - MaxPlayers: %d"), MaxPlayers);
+		UE_LOG(LogTemp, Warning, TEXT("  - bIsLan 파라미터: %s"), bIsLan ? TEXT("True") : TEXT("False"));
+		UE_LOG(LogTemp, Warning, TEXT("  - Online Subsystem: %s"), *OSSName);
+		UE_LOG(LogTemp, Warning, TEXT("  - 최종 LAN 모드 설정: %s"), bShouldBeLAN ? TEXT("True (LAN)") : TEXT("False (Online)"));
+		UE_LOG(LogTemp, Warning, TEXT("═══════════════════════════════════════════════════════"));
 
 
 		// P2P 멀티플레이어를 위한 세션 설정
@@ -345,6 +354,12 @@ void UMyGameInstance::CreateSession(int32 MaxPlayers, bool bIsLan)
 		SessionSettings.bShouldAdvertise = true;
 		SessionSettings.bAllowInvites = true; // P2P 초대 허용
 		SessionSettings.bAllowJoinInProgress = true; // 게임 중 참가 허용
+		
+		UE_LOG(LogTemp, Warning, TEXT("[서버 생성] 세션 설정 완료"));
+		UE_LOG(LogTemp, Warning, TEXT("  - NumPublicConnections: %d"), SessionSettings.NumPublicConnections);
+		UE_LOG(LogTemp, Warning, TEXT("  - bIsLANMatch: %s"), SessionSettings.bIsLANMatch ? TEXT("True") : TEXT("False"));
+		UE_LOG(LogTemp, Warning, TEXT("  - bUsesPresence: %s"), SessionSettings.bUsesPresence ? TEXT("True") : TEXT("False"));
+		UE_LOG(LogTemp, Warning, TEXT("  - bShouldAdvertise: %s"), SessionSettings.bShouldAdvertise ? TEXT("True") : TEXT("False"));
 		
 		SessionSettings.Set(
 			SESSION_SETTINGS_KEY, DesiredServerName,
@@ -394,7 +409,7 @@ void UMyGameInstance::CreateSession(int32 MaxPlayers, bool bIsLan)
 		if (PlayerID.IsEmpty())
 		{
 			UE_LOG(LogTemp, Log, TEXT("[서버 생성] PlayerID가 비어있어 Online Subsystem 시도"));
-			IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+			// OSS는 이미 위에서 선언되었으므로 재사용
 			if (OSS)
 			{
 				UE_LOG(LogTemp, Log, TEXT("[서버 생성] Online Subsystem 찾음: %s"), *OSS->GetSubsystemName().ToString());
@@ -494,6 +509,7 @@ void UMyGameInstance::RefreshServerList()
 		
 		// NULL 서브시스템이면 LAN 검색
 		IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+		FString OSSName = OSS ? OSS->GetSubsystemName().ToString() : TEXT("None");
 		bool bIsLan = (OSS && OSS->GetSubsystemName() == "NULL");
 		
 		SessionSearch->MaxSearchResults = 100;
@@ -502,8 +518,12 @@ void UMyGameInstance::RefreshServerList()
 		// Presence 검색 설정
 		SessionSearch->QuerySettings.Set(FName(TEXT("PRESENCESEARCH")), true, EOnlineComparisonOp::Equals);
 		
-		UE_LOG(LogTemp, Log, TEXT("[MyGameInstance] RefreshServerList: 검색 모드 - LAN: %d, OSS: %s"), 
-			bIsLan ? 1 : 0, OSS ? *OSS->GetSubsystemName().ToString() : TEXT("None"));
+		UE_LOG(LogTemp, Warning, TEXT("═══════════════════════════════════════════════════════"));
+		UE_LOG(LogTemp, Warning, TEXT("[서버 검색] RefreshServerList 호출"));
+		UE_LOG(LogTemp, Warning, TEXT("  - Online Subsystem: %s"), *OSSName);
+		UE_LOG(LogTemp, Warning, TEXT("  - LAN 검색 모드: %s"), bIsLan ? TEXT("True (LAN)") : TEXT("False (Online)"));
+		UE_LOG(LogTemp, Warning, TEXT("  - MaxSearchResults: %d"), SessionSearch->MaxSearchResults);
+		UE_LOG(LogTemp, Warning, TEXT("═══════════════════════════════════════════════════════"));
 		
 		SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
 		UE_LOG(LogTemp, Log, TEXT("[MyGameInstance] RefreshServerList: FindSessions 호출 완료"));
@@ -886,39 +906,39 @@ void UMyGameInstance::OnJoinSessionComplate(FName InSessionName, EOnJoinSessionC
 	
 	UE_LOG(LogTemp, Warning, TEXT("[서버 조인] GetResolvedConnectString 성공 - 원본 주소: %s"), *Address);
 	
-	// NULL Online Subsystem에서는 포트 번호가 0으로 나올 수 있으므로 수정
-	// 주소 형식: "IP:PORT" 또는 "IP:0"
-	FString FinalAddress = Address;
-	int32 ColonIndex;
-	if (Address.FindChar(TEXT(':'), ColonIndex))
-	{
-		FString IPPart = Address.Left(ColonIndex);
-		FString PortPart = Address.Mid(ColonIndex + 1);
-		
-		UE_LOG(LogTemp, Warning, TEXT("[서버 조인] 주소 파싱 - IP: %s, Port: %s"), *IPPart, *PortPart);
-		
-		// 포트가 0이거나 비어있으면 기본 포트(7777) 사용
-		int32 Port = FCString::Atoi(*PortPart);
-		if (PortPart.IsEmpty() || Port == 0)
+		// NULL Online Subsystem에서는 포트 번호가 0으로 나올 수 있으므로 수정
+		// 주소 형식: "IP:PORT" 또는 "IP:0"
+		FString FinalAddress = Address;
+		int32 ColonIndex;
+		if (Address.FindChar(TEXT(':'), ColonIndex))
 		{
-			FinalAddress = FString::Printf(TEXT("%s:7777"), *IPPart);
-			UE_LOG(LogTemp, Warning, TEXT("[서버 조인] ⚠️ 포트 번호가 0이므로 기본 포트(7777)로 변경"));
-			UE_LOG(LogTemp, Warning, TEXT("  - 변경 전: %s"), *Address);
-			UE_LOG(LogTemp, Warning, TEXT("  - 변경 후: %s"), *FinalAddress);
+			FString IPPart = Address.Left(ColonIndex);
+			FString PortPart = Address.Mid(ColonIndex + 1);
+			
+			UE_LOG(LogTemp, Warning, TEXT("[서버 조인] 주소 파싱 - IP: %s, Port: %s"), *IPPart, *PortPart);
+			
+			// 포트가 0이거나 비어있으면 기본 포트(7777) 사용
+			int32 Port = FCString::Atoi(*PortPart);
+			if (PortPart.IsEmpty() || Port == 0)
+			{
+				FinalAddress = FString::Printf(TEXT("%s:7777"), *IPPart);
+				UE_LOG(LogTemp, Warning, TEXT("[서버 조인] ⚠️ 포트 번호가 0이므로 기본 포트(7777)로 변경"));
+				UE_LOG(LogTemp, Warning, TEXT("  - 변경 전: %s"), *Address);
+				UE_LOG(LogTemp, Warning, TEXT("  - 변경 후: %s"), *FinalAddress);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[서버 조인] 포트 번호 정상: %d"), Port);
+			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[서버 조인] 포트 번호 정상: %d"), Port);
+			// 포트가 없으면 기본 포트 추가
+			FinalAddress = FString::Printf(TEXT("%s:7777"), *Address);
+			UE_LOG(LogTemp, Warning, TEXT("[서버 조인] ⚠️ 포트 번호가 없으므로 기본 포트(7777) 추가"));
+			UE_LOG(LogTemp, Warning, TEXT("  - 변경 전: %s"), *Address);
+			UE_LOG(LogTemp, Warning, TEXT("  - 변경 후: %s"), *FinalAddress);
 		}
-	}
-	else
-	{
-		// 포트가 없으면 기본 포트 추가
-		FinalAddress = FString::Printf(TEXT("%s:7777"), *Address);
-		UE_LOG(LogTemp, Warning, TEXT("[서버 조인] ⚠️ 포트 번호가 없으므로 기본 포트(7777) 추가"));
-		UE_LOG(LogTemp, Warning, TEXT("  - 변경 전: %s"), *Address);
-		UE_LOG(LogTemp, Warning, TEXT("  - 변경 후: %s"), *FinalAddress);
-	}
 	
 	Address = FinalAddress; // 최종 주소로 교체
 	UE_LOG(LogTemp, Warning, TEXT("[서버 조인] ✅ 최종 서버 주소: %s"), *Address);
